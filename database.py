@@ -59,6 +59,27 @@ def init_db():
             FOREIGN KEY (priority) REFERENCES priorities(name)
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS recurrence_rules (
+            id TEXT PRIMARY KEY,
+            item_type TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            category TEXT,
+            priority TEXT NOT NULL,
+            notes TEXT DEFAULT '',
+            time_start TEXT DEFAULT '',
+            time_end TEXT DEFAULT '',
+            start_date TEXT NOT NULL,
+            end_date TEXT,
+            weekdays TEXT DEFAULT '[]',
+            every_day INTEGER DEFAULT 0,
+            deadline_offset_days INTEGER DEFAULT 0,
+            active INTEGER DEFAULT 1,
+            last_generated_date TEXT,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
 
     # Migration: add `type` column to existing databases if missing
     cols = [r["name"] for r in c.execute("PRAGMA table_info(tasks)").fetchall()]
@@ -67,6 +88,19 @@ def init_db():
         # Mark existing tasks in 'Совещание' category as meetings
         c.execute("UPDATE tasks SET type='meeting' WHERE category='Совещание'")
         conn.commit()
+    if "result_text" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN result_text TEXT DEFAULT ''")
+        conn.commit()
+    if "recurrence_rule_id" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN recurrence_rule_id TEXT")
+        conn.commit()
+    if "reminder_sent" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN reminder_sent INTEGER DEFAULT 0")
+        conn.commit()
+    if "overdue_notified" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN overdue_notified INTEGER DEFAULT 0")
+        conn.commit()
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_rule_start ON tasks(recurrence_rule_id, start_date)")
 
     # Migration: meetings shouldn't belong to "Совещание" category anymore.
     # Reassign their category to first available category so they don't need that legacy category.
@@ -142,6 +176,7 @@ def off(n):
 # ─── CRUD ────────────────────────────────────────────────
 
 def get_all_data():
+    sync_recurring_items()
     conn = get_conn()
     cats = [r["name"] for r in conn.execute("SELECT name FROM categories ORDER BY id").fetchall()]
     pris = [r["name"] for r in conn.execute("SELECT name FROM priorities ORDER BY sort_order").fetchall()]
@@ -163,6 +198,10 @@ def get_all_data():
             "completedAt": t["completed_at"],
             "createdAt": t["created_at"],
             "type": t["type"] if "type" in t.keys() else "task",
+            "result": t["result_text"] if "result_text" in t.keys() else "",
+            "recurrenceRuleId": t["recurrence_rule_id"] if "recurrence_rule_id" in t.keys() else None,
+            "reminderSent": t["reminder_sent"] if "reminder_sent" in t.keys() else 0,
+            "overdueNotified": t["overdue_notified"] if "overdue_notified" in t.keys() else 0,
         })
     protected = [r["name"] for r in conn.execute("SELECT name FROM categories WHERE protected=1").fetchall()]
     conn.close()
@@ -171,23 +210,30 @@ def get_all_data():
         "priorities": pris,
         "tasks": tasks,
         "protectedCats": protected,
+        "recurrenceRules": get_recurrence_rules(),
     }
 
 
 def add_task(data):
     conn = get_conn()
     tid = uid()
+    category = data.get("cat")
+    if data.get("type") == "meeting" and category == "Совещание":
+        cat_row = conn.execute("SELECT name FROM categories ORDER BY id LIMIT 1").fetchone()
+        category = cat_row["name"] if cat_row else "Рабочая"
     conn.execute("""
         INSERT INTO tasks (id, name, description, category, priority,
-            start_date, deadline, progress, notes, time_start, time_end, completed_at, type)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            start_date, deadline, progress, notes, time_start, time_end, completed_at, type, result_text, recurrence_rule_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
-        tid, data["name"], data.get("desc", ""), data["cat"], data["pri"],
+        tid, data["name"], data.get("desc", ""), category, data["pri"],
         data.get("start", ""), data.get("deadline", ""),
         int(data.get("progress", 0)), data.get("notes", ""),
         data.get("timeStart", ""), data.get("timeEnd", ""),
         data.get("completedAt"),
         data.get("type", "task"),
+        data.get("result", ""),
+        data.get("recurrenceRuleId"),
     ))
     conn.commit()
     conn.close()
@@ -204,6 +250,8 @@ def update_task(task_id, data):
         "progress": "progress", "notes": "notes",
         "timeStart": "time_start", "timeEnd": "time_end",
         "completedAt": "completed_at", "type": "type",
+        "result": "result_text", "recurrenceRuleId": "recurrence_rule_id",
+        "reminderSent": "reminder_sent", "overdueNotified": "overdue_notified",
     }
     for js_key, db_col in mapping.items():
         if js_key in data:
@@ -300,16 +348,158 @@ def import_data(json_str):
         try:
             conn.execute("""
                 INSERT OR REPLACE INTO tasks (id,name,description,category,priority,
-                    start_date,deadline,progress,notes,time_start,time_end,completed_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    start_date,deadline,progress,notes,time_start,time_end,completed_at,type,result_text,recurrence_rule_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 t.get("id", uid()), t["name"], t.get("desc", ""),
                 t["cat"], t["pri"], t.get("start", ""), t.get("deadline", ""),
                 int(t.get("progress", 0)), t.get("notes", ""),
                 t.get("timeStart", ""), t.get("timeEnd", ""),
                 t.get("completedAt"),
+                t.get("type", "task"),
+                t.get("result", ""),
+                t.get("recurrenceRuleId"),
             ))
         except Exception:
             pass
     conn.commit()
     conn.close()
+
+
+def get_recurrence_rules():
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM recurrence_rules WHERE active=1 ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [{
+        "id": r["id"],
+        "itemType": r["item_type"],
+        "name": r["name"],
+        "desc": r["description"],
+        "cat": r["category"],
+        "pri": r["priority"],
+        "notes": r["notes"],
+        "timeStart": r["time_start"] or "",
+        "timeEnd": r["time_end"] or "",
+        "startDate": r["start_date"],
+        "endDate": r["end_date"],
+        "weekdays": json.loads(r["weekdays"] or "[]"),
+        "everyDay": bool(r["every_day"]),
+        "deadlineOffsetDays": r["deadline_offset_days"] or 0,
+    } for r in rows]
+
+
+def add_recurrence_rule(rule):
+    conn = get_conn()
+    rid = uid()
+    conn.execute("""
+        INSERT INTO recurrence_rules
+        (id,item_type,name,description,category,priority,notes,time_start,time_end,start_date,end_date,weekdays,every_day,deadline_offset_days,last_generated_date)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        rid, rule["itemType"], rule["name"], rule.get("desc", ""), rule.get("cat"), rule["pri"],
+        rule.get("notes", ""), rule.get("timeStart", ""), rule.get("timeEnd", ""),
+        rule["startDate"], rule.get("endDate"), json.dumps(rule.get("weekdays", []), ensure_ascii=False),
+        1 if rule.get("everyDay") else 0, int(rule.get("deadlineOffsetDays", 0)), None,
+    ))
+    conn.commit()
+    conn.close()
+    sync_recurring_items()
+    return rid
+
+
+def update_recurrence_rule(rule_id, rule):
+    conn = get_conn()
+    conn.execute("""
+        UPDATE recurrence_rules SET item_type=?,name=?,description=?,category=?,priority=?,notes=?,time_start=?,time_end=?,
+        start_date=?,end_date=?,weekdays=?,every_day=?,deadline_offset_days=?,last_generated_date=NULL
+        WHERE id=?
+    """, (
+        rule["itemType"], rule["name"], rule.get("desc", ""), rule.get("cat"), rule["pri"], rule.get("notes", ""),
+        rule.get("timeStart", ""), rule.get("timeEnd", ""), rule["startDate"], rule.get("endDate"),
+        json.dumps(rule.get("weekdays", []), ensure_ascii=False), 1 if rule.get("everyDay") else 0,
+        int(rule.get("deadlineOffsetDays", 0)), rule_id,
+    ))
+    conn.execute("""
+        DELETE FROM tasks
+        WHERE recurrence_rule_id=? AND start_date>=date('now','localtime') AND (completed_at IS NULL OR completed_at='')
+    """, (rule_id,))
+    conn.commit()
+    conn.close()
+    sync_recurring_items()
+
+
+def delete_recurrence_rule(rule_id):
+    conn = get_conn()
+    conn.execute("UPDATE recurrence_rules SET active=0 WHERE id=?", (rule_id,))
+    conn.commit()
+    conn.close()
+
+
+def _rule_matches(rule, day):
+    if rule["every_day"]:
+        return True
+    weekdays = json.loads(rule["weekdays"] or "[]")
+    if not weekdays:
+        return False
+    # Monday=0 ... Sunday=6
+    return datetime.strptime(day, "%Y-%m-%d").weekday() in weekdays
+
+
+def sync_recurring_items():
+    conn = get_conn()
+    rules = conn.execute("SELECT * FROM recurrence_rules WHERE active=1").fetchall()
+    today = datetime.now().date()
+    horizon = today + timedelta(days=30)
+    for rule in rules:
+        start = datetime.strptime(rule["start_date"], "%Y-%m-%d").date()
+        end = datetime.strptime(rule["end_date"], "%Y-%m-%d").date() if rule["end_date"] else horizon
+        end = min(end, horizon)
+        if start > end:
+            continue
+        day = start
+        while day <= end:
+            d = day.strftime("%Y-%m-%d")
+            if _rule_matches(rule, d):
+                deadline = day + timedelta(days=int(rule["deadline_offset_days"] or 0))
+                conn.execute("""
+                    INSERT OR IGNORE INTO tasks (id,name,description,category,priority,start_date,deadline,progress,notes,time_start,time_end,type,result_text,recurrence_rule_id)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    uid(), rule["name"], rule["description"] or "", rule["category"] or "Рабочая",
+                    rule["priority"], d, deadline.strftime("%Y-%m-%d"), 0, rule["notes"] or "",
+                    rule["time_start"] or "", rule["time_end"] or "", rule["item_type"], "", rule["id"],
+                ))
+            day += timedelta(days=1)
+        conn.execute("UPDATE recurrence_rules SET last_generated_date=? WHERE id=?", (end.strftime("%Y-%m-%d"), rule["id"]))
+    conn.commit()
+    conn.close()
+
+
+def get_due_notifications(now_iso=None):
+    conn = get_conn()
+    now_dt = datetime.strptime(now_iso, "%Y-%m-%dT%H:%M") if now_iso else datetime.now()
+    today = now_dt.strftime("%Y-%m-%d")
+    notifications = []
+
+    meetings = conn.execute("""
+        SELECT * FROM tasks WHERE type='meeting' AND progress<100 AND reminder_sent=0
+        AND start_date IS NOT NULL AND start_date!='' AND time_start IS NOT NULL AND time_start!=''
+    """).fetchall()
+    for m in meetings:
+        start_dt = datetime.strptime(f"{m['start_date']} {m['time_start']}", "%Y-%m-%d %H:%M")
+        delta = (start_dt - now_dt).total_seconds() / 60
+        if 0 <= delta <= 5:
+            notifications.append({"id": m["id"], "kind": "meeting_reminder", "title": "Скоро совещание", "text": f"«{m['name']}» начнётся в {max(1, int(delta))} мин."})
+            conn.execute("UPDATE tasks SET reminder_sent=1 WHERE id=?", (m["id"],))
+
+    overdue = conn.execute("""
+        SELECT * FROM tasks WHERE type='task' AND progress<100 AND overdue_notified=0
+        AND deadline IS NOT NULL AND deadline!='' AND deadline < ?
+    """, (today,)).fetchall()
+    for t in overdue:
+        notifications.append({"id": t["id"], "kind": "task_overdue", "title": "Задача просрочена", "text": f"«{t['name']}» просрочена с {t['deadline']}."})
+        conn.execute("UPDATE tasks SET overdue_notified=1 WHERE id=?", (t["id"],))
+
+    conn.commit()
+    conn.close()
+    return notifications
