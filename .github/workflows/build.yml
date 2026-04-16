@@ -16,36 +16,16 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
-      - name: Debug workspace
-        shell: pwsh
-        run: |
-          Write-Host "GITHUB_WORKSPACE = $env:GITHUB_WORKSPACE"
-          Get-ChildItem -Force $env:GITHUB_WORKSPACE
+          python-version: '3.11'
 
       - name: Install dependencies
-        shell: pwsh
         run: |
-          Set-Location $env:GITHUB_WORKSPACE
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
 
       - name: Build EXE with PyInstaller
-        shell: pwsh
         run: |
-          Set-Location $env:GITHUB_WORKSPACE
-          Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
-
-          pyinstaller --clean --onefile --windowed --name "SmartPlanner" `
-            --hidden-import "planner_api" `
-            --hidden-import "database" `
-            --hidden-import "webview.platforms.edgechromium" `
-            --hidden-import "webview.platforms.winforms" `
-            --hidden-import "clr_loader" `
-            --collect-all "webview" `
-            smart_planner.py
+          pyinstaller --onefile --windowed --name "SmartPlanner" --hidden-import "webview.platforms.edgechromium" --hidden-import "webview.platforms.winforms" --hidden-import "clr_loader" --collect-all "webview" smart_planner.py
 
       - name: Upload EXE as artifact
         uses: actions/upload-artifact@v4
