@@ -178,6 +178,7 @@ const td=()=>new Date().toISOString().split("T")[0];
 const fmt=d=>{if(!d)return"\u2014";const t=new Date(d);return`${String(t.getDate()).padStart(2,"0")}.${String(t.getMonth()+1).padStart(2,"0")}.${t.getFullYear()}`};
 const fmtS=d=>{if(!d)return"";const t=new Date(d);return`${String(t.getDate()).padStart(2,"0")}.${String(t.getMonth()+1).padStart(2,"0")}`};
 const diffD=(a,b)=>Math.round((new Date(a)-new Date(b))/864e5);
+const toDateTime=(date,time)=>{if(!date||!time)return null;const dt=new Date(`${date}T${time}:00`);return Number.isNaN(dt.getTime())?null:dt};
 /* Tabs split: separate Meetings tab, remove "Расписание" (integrated into Meetings) */
 const TABS=["Панель","Задачи","Совещания","Сегодня","Журнал","Аналитика","Экспорт"];
 const TAB_ICONS={"Панель":"\ud83d\udcca","Задачи":"\ud83d\udccb","Совещания":"\ud83d\udd52","Сегодня":"\u2600\ufe0f","Журнал":"\ud83d\udcd3","Аналитика":"\ud83d\udcc8","Экспорт":"\ud83d\udcc4"};
@@ -260,10 +261,10 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 </div></div></div></div>}
 
 /* ─── Meeting Form ─── */
-function MForm({onClose,initial,onSubmit,pris}){
-const[f,setF]=useState(initial?{...initial}:{name:"",pri:pris[1]||pris[0]||"",desc:"",start:td(),deadline:td(),timeStart:"",timeEnd:"",progress:0,notes:""});
+function MForm({onClose,initial,onSubmit,pris,cats}){
+const[f,setF]=useState(initial?{...initial}:{name:"",cat:cats[0]||"",pri:pris[1]||pris[0]||"",desc:"",start:td(),deadline:td(),timeStart:"",timeEnd:"",progress:0,notes:"",meetingResult:""});
 const s=(k,v)=>setF(p=>({...p,[k]:v}));
-const go=()=>{if(!f.name.trim())return;onSubmit({...f,progress:parseInt(f.progress)||0,type:"meeting",cat:"Совещание"});onClose()};
+const go=()=>{if(!f.name.trim())return;onSubmit({...f,progress:parseInt(f.progress)||0,type:"meeting",cat:f.cat||cats[0]||"Рабочая"});onClose()};
 return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.stopPropagation()}>
 <div className="mh" style={{background:"linear-gradient(135deg,rgba(6,182,212,.08),rgba(6,182,212,.02))"}}><h3>🕐 {initial?"Редактировать совещание":"Новое совещание"}</h3><button className="mc" onClick={onClose}>×</button></div>
 <div className="mb"><div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -277,8 +278,12 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 <div className="fl"><label style={{color:"var(--cyan2)"}}>🕐 Время начала</label><input type="time" value={f.timeStart||""} onChange={e=>s("timeStart",e.target.value)}/></div>
 <div className="fl"><label style={{color:"var(--cyan2)"}}>🕐 Время окончания</label><input type="time" value={f.timeEnd||""} onChange={e=>s("timeEnd",e.target.value)}/></div>
 </div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+<div className="fl"><label>Категория</label><select value={f.cat} onChange={e=>s("cat",e.target.value)}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
 <div className="fl"><label>Приоритет</label><select value={f.pri} onChange={e=>s("pri",e.target.value)}>{pris.map(p=><option key={p}>{p}</option>)}</select></div>
+</div>
 <div className="fl"><label>Заметки</label><textarea value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Заметки по совещанию..."/></div>
+<div className="fl"><label>Результаты совещания</label><textarea value={f.meetingResult||""} onChange={e=>s("meetingResult",e.target.value)} placeholder="Решения, договоренности, ответственные..."/></div>
 <button className="bp bp-cyan" onClick={go} style={{marginTop:6}}>{initial?"💾 Сохранить":"➕ Добавить совещание"}</button>
 </div></div></div></div>}
 
@@ -322,9 +327,14 @@ return<><div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex
 <PBar value={task.progress} color={st.c} onChange={p=>onProg(task.id,p)} size={14}/>
 </div>
 {task.notes&&<div style={{marginBottom:18}}><div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>Заметки</div><div style={{background:"var(--bg)",borderRadius:12,padding:14,fontSize:14,color:"var(--text2)",lineHeight:1.6,border:"1px solid var(--border)"}}>{task.notes}</div></div>}
+{isM&&<div style={{marginBottom:18}}>
+<div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>Результаты совещания</div>
+<div style={{background:"var(--bg)",borderRadius:12,padding:14,fontSize:14,color:"var(--text2)",lineHeight:1.6,border:"1px solid var(--border)",whiteSpace:"pre-wrap"}}>{task.meetingResult?.trim()?task.meetingResult:"Результаты пока не внесены"}</div>
+</div>}
 </div>
 <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:10,justifyContent:"flex-end"}}>
-<button className="bd" onClick={()=>setCd(true)}>🗑 Удалить</button>
+<button className="bd" onClick={()=>setCd(true)}>🗑 Удалить</button>,
+{isM&&<button className="bo" onClick={()=>onEdit(task)}>📝 Внести результаты</button>}
 <button className="bo" onClick={()=>onEdit(task)}>✏️ Редактировать</button>
 {task.progress<100&&<button className="bs" onClick={()=>setCf(true)}>Завершить ✅</button>}
 </div></div>
@@ -438,8 +448,8 @@ const[anPri,setAnPri]=useState("");
 const reload=useCallback(async()=>{const raw=await callApi("get_data");setData(JSON.parse(raw));setLoading(false)},[]);
 useEffect(()=>{reload()},[reload]);
 
-const addT=async t=>{await callApi("add_task",JSON.stringify(t));reload()};
-const updT=async(id,patch)=>{await callApi("update_task",id,JSON.stringify(patch));reload()};
+const addT=async t=>{const res=await callApi("add_task",JSON.stringify(t));if(typeof res==="string"&&res.startsWith("error:")){showToast(`Ошибка сохранения: ${res}`,"error");return}reload()};
+const updT=async(id,patch)=>{const res=await callApi("update_task",id,JSON.stringify(patch));if(typeof res==="string"&&res.startsWith("error:")){showToast(`Ошибка сохранения: ${res}`,"error");return}reload()};
 const delT=async id=>{await callApi("delete_task",id);setDetailTask(null);reload()};
 const setProg=async(id,p)=>{const patch=p>=100?{progress:p,completedAt:td()}:{progress:p,completedAt:null};await callApi("update_task",id,JSON.stringify(patch));if(detailTask&&detailTask.id===id)setDetailTask(prev=>({...prev,...patch}));reload()};
 
@@ -486,6 +496,33 @@ const weekD=useMemo(()=>{const m=getMon(schedDate);return Array.from({length:7},
 
 const getMeetingsForDay=useCallback(day=>meetings.filter(m=>{if(!m.name||m.progress>=100)return false;if(m.start&&m.start<=day&&m.deadline&&m.deadline>=day)return true;if(m.start===day||m.deadline===day)return true;return false}).sort((a,b)=>(a.timeStart||"99:99").localeCompare(b.timeStart||"99:99")),[meetings]);
 
+/* In-app notifications: 5 min before meeting and one-time overdue task alert */
+useEffect(()=>{
+const tick=()=>{
+const nowTs=new Date();
+meetings.forEach(m=>{
+if(m.progress>=100||m.reminderSentAt||!m.start||!m.timeStart)return;
+const startTs=toDateTime(m.start,m.timeStart);
+if(!startTs)return;
+const diffMin=Math.floor((startTs-nowTs)/60000);
+if(diffMin>=0&&diffMin<=5){
+showToast(`⏰ Совещание «${m.name}» начнётся через ${diffMin} мин.`,null);
+updT(m.id,{reminderSentAt:new Date().toISOString()});
+}
+});
+tasksOnly.forEach(t=>{
+if(t.progress>=100||t.overdueNotifiedAt||!t.deadline)return;
+if(t.deadline<td()){
+showToast(`⚠️ Задача «${t.name}» просрочена`, "error");
+updT(t.id,{overdueNotifiedAt:new Date().toISOString()});
+}
+});
+};
+tick();
+const timer=setInterval(tick,60000);
+return()=>clearInterval(timer);
+},[meetings,tasksOnly]);
+
 const daysInM=useMemo(()=>{const[y,m]=habMonth.split("-").map(Number);return new Date(y,m,0).getDate()},[habMonth]);
 
 /* Meetings list with filter + sort */
@@ -519,6 +556,12 @@ if(expPris.length&&!expPris.includes(t.pri))return false;
 if(expStat.length&&!expStat.includes(getS(t,now).l))return false;
 return true
 }),[tasksOnly,expFrom,expTo,expCats,expPris,expStat,now]);
+const expMeetings=useMemo(()=>meetings.filter(m=>{
+if(!m.name)return false;
+const baseDate=m.start||m.deadline;
+if(!baseDate)return false;
+return baseDate>=expFrom&&baseDate<=expTo;
+}),[meetings,expFrom,expTo]);
 
 const expStats=useMemo(()=>{const s={total:expFiltered.length,done:0,active:0,overdue:0,burning:0};expFiltered.forEach(t=>{const st=getS(t,now);if(st.l==="Выполнено")s.done++;else if(st.l==="Просрочено")s.overdue++;else if(st.l==="Горит")s.burning++;else s.active++});s.pct=s.total?Math.round(s.done/s.total*100):0;s.avgProg=s.total?Math.round(expFiltered.reduce((a,t)=>a+(t.progress||0),0)/s.total):0;return s},[expFiltered,now]);
 
@@ -534,6 +577,7 @@ const onTimeRate=done.length?Math.round(onTimeDone/done.length*100):null;
 const latDone=done.filter(t=>t.deadline&&t.completedAt>t.deadline).length;
 const avgTimeDays=(()=>{const ts=done.filter(t=>t.completedAt&&t.start);if(!ts.length)return null;return Math.round(ts.reduce((s,t)=>s+Math.max(0,diffD(t.completedAt,t.start)),0)/ts.length*10)/10})();
 const avgProg=expStats.avgProg;
+const meetingsInReport=[...expMeetings].sort((a,b)=>(a.start||"").localeCompare(b.start||"")||(a.timeStart||"").localeCompare(b.timeStart||""));
 const statuses=[
 {label:"Выполнено",count:done.length,color:"#10B981",icon:"✓"},
 {label:"В работе",count:inprog.length,color:"#4361EE",icon:"⟳"},
@@ -542,6 +586,7 @@ const statuses=[
 ].filter(s=>s.count>0);
 const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const taskRow=(t,showDeadline=false)=>{const st=getS(t,now);const cc=st.c==='var(--green)'?'#10B981':st.c==='var(--red)'?'#EF4444':st.c==='var(--amber)'?'#F59E0B':'#4361EE';return`<tr><td><strong>${esc(t.name)}</strong>${t.desc?'<div style="color:#64748B;font-size:11px;margin-top:2px">'+esc(t.desc)+'</div>':''}</td><td><span class="bdg" style="color:${gc(t.cat)};background:${gc(t.cat)}15">${esc(t.cat)}</span></td><td><span class="bdg" style="color:${gp(t.pri)};background:${gp(t.pri)}15">${esc(t.pri)}</span></td>${showDeadline?`<td>${fmt(t.deadline)}</td>`:''}<td style="color:${cc};font-weight:600">${st.i} ${st.l}</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:#F0F4FA;border-radius:4px;overflow:hidden;min-width:60px"><div style="width:${t.progress}%;height:100%;background:${cc}"></div></div><span style="font-family:'IBM Plex Mono';font-weight:700;font-size:11px;min-width:32px;text-align:right">${t.progress}%</span></div></td>${t.completedAt?`<td style="color:#10B981;font-weight:600">${fmt(t.completedAt)}</td>`:''}</tr>`};
+const meetingRow=m=>`<tr><td><strong>${esc(m.name)}</strong>${m.desc?'<div style="color:#64748B;font-size:11px;margin-top:2px">'+esc(m.desc)+'</div>':''}</td><td>${fmt(m.start)}${m.timeStart?` · ${esc(m.timeStart)}${m.timeEnd?`–${esc(m.timeEnd)}`:""}`:""}</td><td>${fmt(m.deadline)}</td><td><span class="bdg" style="color:${gp(m.pri)};background:${gp(m.pri)}15">${esc(m.pri)}</span></td><td>${m.meetingResult?esc(m.meetingResult):'<span style="color:#94A3B8">—</span>'}</td></tr>`;
 
 const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Отчёт Smart Planner</title>
 <style>
@@ -603,7 +648,7 @@ tr:last-child td{border-bottom:none}
 </style></head><body>
 
 <div class="header"><div class="header-content">
-<div><h1>⚡ Smart Planner</h1><div class="subtitle">Отчёт о выполнении задач</div></div>
+<div><h1>⚡ Smart Planner</h1><div class="subtitle">Отчёт по задачам и совещаниям</div></div>
 <div class="period">
 <div class="label">Отчётный период</div>
 <div class="dates">${fmt(expFrom)} — ${fmt(expTo)}</div>
@@ -667,6 +712,9 @@ ${inprog.length?`<div class="section"><h2 style="color:#4361EE">⟳ Задачи
 
 ${done.length?`<div class="section page-break"><h2 style="color:#10B981">✓ Выполненные задачи <span class="count">${done.length}</span></h2>
 <table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Статус</th><th>Прогресс</th><th>Завершено</th></tr></thead><tbody>${done.map(t=>taskRow(t,false)).join('')}</tbody></table></div>`:''}
+
+${meetingsInReport.length?`<div class="section page-break"><h2 style="color:#0891B2">🕐 Совещания за период <span class="count">${meetingsInReport.length}</span></h2>
+<table><thead><tr><th>Совещание</th><th>Начало</th><th>Окончание</th><th>Приоритет</th><th>Результаты</th></tr></thead><tbody>${meetingsInReport.map(meetingRow).join('')}</tbody></table></div>`:''}
 
 <div class="footer"><div class="logo-footer">⚡ Smart Planner</div><div>Автоматический отчёт · ${fmt(now)}</div></div>
 </body></html>`;
@@ -972,7 +1020,7 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 {/* ═════ ЭКСПОРТ ═════ */}
 {tab==="Экспорт"&&<div>
 <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>📄 Экспорт отчёта</div>
-<div style={{color:"var(--text3)",fontSize:13,marginBottom:20}}>Отчёт для руководителя · только по задачам (без совещаний)</div>
+<div style={{color:"var(--text3)",fontSize:13,marginBottom:20}}>Отчёт для руководителя · задачи + отдельный блок по совещаниям и их результатам</div>
 <div style={{display:"grid",gridTemplateColumns:"340px 1fr",gap:20}} className="two-col">
 <div className="card" style={{alignSelf:"flex-start"}}>
 <div className="stitle"><span className="stitle-icon">🔍</span> Параметры</div>
@@ -987,6 +1035,7 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 <div style={{background:"var(--bg)",borderRadius:10,padding:12,marginBottom:16}}>
 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"var(--text3)"}}>В выборке:</span><span style={{fontWeight:700,fontFamily:"var(--mono)"}}>{expFiltered.length}</span></div>
 <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"var(--text3)"}}>Выполнено:</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--green)"}}>{expStats.done}</span></div>
+<div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginTop:4}}><span style={{color:"var(--text3)"}}>Совещаний в периоде:</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--cyan2)"}}>{expMeetings.length}</span></div>
 </div>
 <button className="bp" onClick={genReport} disabled={expGen||!expFiltered.length} style={{opacity:expFiltered.length?1:.5}}>{expGen?"⏳ Формирование...":"📄 Сформировать отчёт"}</button>
 </div>
@@ -998,7 +1047,7 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 </div>
 
 {showForm&&<TForm onClose={()=>{setShowForm(false);setEditTask(null)}} initial={editTask} cats={data.categories} pris={data.priorities} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
-{showMForm&&<MForm onClose={()=>{setShowMForm(false);setEditTask(null)}} initial={editTask} pris={data.priorities} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
+{showMForm&&<MForm onClose={()=>{setShowMForm(false);setEditTask(null)}} initial={editTask} pris={data.priorities} cats={data.categories} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
 {detailTask&&<TDetail task={data.tasks.find(x=>x.id===detailTask.id)||detailTask} onClose={()=>setDetailTask(null)} now={now} onEdit={t=>{setDetailTask(null);setEditTask(t);if(t.type==="meeting")setShowMForm(true);else setShowForm(true)}} onDelete={delT} onProg={setProg}/>}
 {showSettings&&<Settings data={data} onClose={()=>setShowSettings(false)} onUpdate={reload} showToast={showToast}/>}
 {toast&&<Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)}/>}
