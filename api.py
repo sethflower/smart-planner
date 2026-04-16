@@ -19,15 +19,21 @@ class Api:
 
     def add_task(self, data_json):
         """Add a new task. Returns new task id."""
-        data = json.loads(data_json)
-        tid = db.add_task(data)
-        return tid
+        try:
+            data = json.loads(data_json)
+            tid = db.add_task(data)
+            return tid
+        except Exception as e:
+            return f"error: {e}
 
     def update_task(self, task_id, data_json):
         """Update existing task fields."""
-        data = json.loads(data_json)
-        db.update_task(task_id, data)
-        return "ok"
+        try:
+            data = json.loads(data_json)
+            db.update_task(task_id, data)
+            return "ok"
+        except Exception as e:
+            return f"error: {e}"
 
     def delete_task(self, task_id):
         """Delete a task by id."""
