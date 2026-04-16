@@ -5,10 +5,23 @@ import sqlite3
 import json
 import uuid
 import os
+import sys
 from datetime import datetime, timedelta
 
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smart_planner.db")
+def get_db_path():
+    """Возвращает путь к БД. В режиме .exe сохраняет рядом с самим .exe,
+    иначе рядом со скриптом."""
+    if getattr(sys, 'frozen', False):
+        # Запущено как PyInstaller .exe — используем директорию с .exe
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # Обычный Python — директория со скриптом
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_dir, "smart_planner.db")
+
+
+DB_PATH = get_db_path()
 
 
 def get_conn():
