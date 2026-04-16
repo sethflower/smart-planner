@@ -857,6 +857,7 @@ ${m.desc?'<div style="font-size:11px;color:#64748B;margin-bottom:6px"><em>Пов
 
 <div class="footer"><div class="logo-footer">⚡ Smart Planner</div><div>Автоматический отчёт · ${fmt(now)}</div></div>
 </body></html>`;
+'''
 setExpPreview(html);setExpGen(false)},200)};
 
 
