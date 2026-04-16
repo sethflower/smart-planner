@@ -232,6 +232,50 @@ return<div className="co" onClick={onNo}><div className="cb" onClick={e=>e.stopP
 
 function Toast({msg,type,onDone}){useEffect(()=>{const t=setTimeout(onDone,2500);return()=>clearTimeout(t)},[]);return<div className={`toast ${type||""}`}>{msg}</div>}
 
+function KpiDrill({kpi,tasks,now,onClose,onOpenTask}){
+const titles={total:"Все задачи",done:"Выполненные задачи",active:"Задачи в работе",burn:"Горящие задачи",over:"Просроченные задачи"};
+const icons={total:"📋",done:"✅",active:"🔄",burn:"⚠️",over:"🔴"};
+const colors={total:"var(--accent)",done:"var(--green)",active:"var(--accent)",burn:"var(--amber)",over:"var(--red)"};
+const filter={
+total:t=>t.name,
+done:t=>t.name&&getS(t,now).l==="Выполнено",
+active:t=>{if(!t.name)return false;const s=getS(t,now).l;return s!=="Выполнено"},
+burn:t=>t.name&&getS(t,now).l==="Горит",
+over:t=>t.name&&getS(t,now).l==="Просрочено",
+}[kpi];
+const filtered=tasks.filter(filter);
+return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.stopPropagation()} style={{width:"min(720px,94vw)",maxHeight:"85vh"}}>
+<div className="mh" style={{borderTop:`4px solid ${colors[kpi]}`}}>
+<h3>{icons[kpi]} {titles[kpi]} <span style={{fontWeight:500,fontSize:13,color:"var(--text3)",marginLeft:8}}>({filtered.length})</span></h3>
+<button className="mc" onClick={onClose}>×</button>
+</div>
+<div className="mb" style={{padding:16}}>
+{filtered.length===0?<div style={{textAlign:"center",padding:50,color:"var(--text4)"}}>
+<div style={{fontSize:44,marginBottom:10}}>🎉</div>
+<div style={{fontWeight:700,fontSize:15}}>Нет задач в этой категории</div>
+</div>:<div style={{display:"flex",flexDirection:"column",gap:6}}>
+{filtered.map(t=>{const st=getS(t,now);const dl=t.deadline?diffD(t.deadline,now):null;const isMtg=t.cat==="Совещание";
+return<div key={t.id} className="tr" onClick={()=>{onClose();onOpenTask(t)}}>
+<div className="task-left" style={{background:gp(t.pri)}}/>
+<div style={{flex:1,minWidth:0}}>
+<div style={{fontWeight:600,fontSize:14}}>{t.name}</div>
+<div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
+<Bdg color={gc(t.cat)}>{t.cat}</Bdg>
+<Bdg color={gp(t.pri)} bg={gb(t.pri)}>{t.pri}</Bdg>
+{isMtg&&t.timeStart&&<span className="meeting-time">🕐 {t.timeStart}–{t.timeEnd||"?"}</span>}
+{t.deadline&&<span style={{fontSize:11,color:dl<0?"var(--red)":dl<=2?"var(--amber)":"var(--text3)"}}>📅 {fmt(t.deadline)}{dl!==null&&dl<0?` (+${Math.abs(dl)}д)`:""}</span>}
+</div>
+</div>
+<div style={{textAlign:"right",flexShrink:0}}>
+<Bdg color={st.c}>{st.i} {st.l}</Bdg>
+<div style={{fontSize:13,fontWeight:700,color:st.c,fontFamily:"var(--mono)",marginTop:3}}>{t.progress}%</div>
+</div>
+</div>})}
+</div>}
+</div>
+</div></div>
+}
+
 function TForm({onClose,initial,onSubmit,cats,pris}){
 const[f,setF]=useState(initial?{...initial}:{name:"",cat:cats[0]||"",pri:pris[1]||pris[0]||"",desc:"",start:td(),deadline:"",progress:0,notes:"",timeStart:"",timeEnd:""});
 const s=(k,v)=>setF(p=>({...p,[k]:v}));const isMeeting=f.cat==="Совещание";
@@ -328,16 +372,6 @@ const doDelPri=async p=>{
 await callApi("delete_priority",p);
 onUpdate();
 };
-const doExport=async()=>{
-const json=await callApi("export_json");
-const b=new Blob([json],{type:"application/json"});
-const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="planner-backup.json";a.click();
-};
-const doImport=()=>{
-const inp=document.createElement("input");inp.type="file";inp.accept=".json";
-inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
-r.onload=async ev=>{const res=await callApi("import_json",ev.target.result);if(res==="ok"){showToast("Данные импортированы!");onUpdate()}else showToast("Ошибка импорта","error")};r.readAsText(f)};inp.click();
-};
 return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.stopPropagation()}>
 <div className="mh"><h3>⚙️ Настройки</h3><button className="mc" onClick={onClose}>×</button></div>
 <div className="mb">
@@ -363,9 +397,7 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 <input value={np} onChange={e=>setNp(e.target.value)} placeholder="Новый приоритет..." style={{flex:1,padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:13,background:"var(--bg)",color:"var(--text)"}} onKeyDown={e=>{if(e.key==="Enter")doAddPri()}}/>
 <button className="bo" onClick={doAddPri}>+</button>
 </div></div>
-<div><div className="stitle"><span className="stitle-icon">💾</span> Данные</div>
-<div style={{display:"flex",gap:10}}><button className="bo" onClick={doExport}>📥 Экспорт</button><button className="bo" onClick={doImport}>📤 Импорт</button></div>
-</div></div></div></div>}
+</div></div></div>}
 
 /* DonutChart */
 function DonutChart({segments,size=140,thickness=24}){const r=size/2;const cr=r-thickness/2;const circ=2*Math.PI*cr;let offset=0;
@@ -392,6 +424,13 @@ const[schedDate,setSchedDate]=useState(now);
 const[habMonth,setHabMonth]=useState(()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`});
 const[toast,setToast]=useState(null);
 const showToast=(msg,type)=>setToast({msg,type});
+const[drillKpi,setDrillKpi]=useState(null);
+/* Analytics state */
+const[anPeriod,setAnPeriod]=useState("all");
+const[anCat,setAnCat]=useState("");
+const[anPri,setAnPri]=useState("");
+const[anCharts,setAnCharts]=useState({kpis:true,status:true,category:true,priority:true,productivity:true,timeline:true,heatmap:true,catPri:true,avgProg:true,completion:true,onTime:true,upcoming:true});
+const[anShowSettings,setAnShowSettings]=useState(false);
 
 /* Load data from SQLite via Python bridge */
 const reload=useCallback(async()=>{
@@ -424,7 +463,12 @@ reload();
 
 const stats=useMemo(()=>{const s={total:0,done:0,active:0,burn:0,over:0};data.tasks.forEach(t=>{if(!t.name)return;s.total++;const st=getS(t,now);if(st.l==="Выполнено")s.done++;else if(st.l==="В работе")s.active++;else if(st.l==="Горит"){s.burn++;s.active++}else if(st.l==="Просрочено")s.over++;else s.active++});s.pct=s.total>0?Math.round(s.done/s.total*100):0;return s},[data.tasks,now]);
 
-const filtered=useMemo(()=>{let l=[...data.tasks].filter(t=>t.name);if(filter==="active")l=l.filter(t=>getS(t,now).l!=="Выполнено");else if(filter==="completed")l=l.filter(t=>getS(t,now).l==="Выполнено");if(sortBy==="deadline")l.sort((a,b)=>(a.deadline||"9999").localeCompare(b.deadline||"9999"));else{const o={};data.priorities.forEach((p,i)=>o[p]=i);l.sort((a,b)=>(o[a.pri]??99)-(o[b.pri]??99)||(a.deadline||"9999").localeCompare(b.deadline||"9999"))}return l},[data.tasks,data.priorities,filter,sortBy,now]);
+const filtered=useMemo(()=>{let l=[...data.tasks].filter(t=>t.name);if(filter==="active")l=l.filter(t=>getS(t,now).l!=="Выполнено");else if(filter==="completed")l=l.filter(t=>getS(t,now).l==="Выполнено");
+if(sortBy==="deadline")l.sort((a,b)=>(a.deadline||"9999").localeCompare(b.deadline||"9999"));
+else if(sortBy==="priority"){const o={};data.priorities.forEach((p,i)=>o[p]=i);l.sort((a,b)=>(o[a.pri]??99)-(o[b.pri]??99)||(a.deadline||"9999").localeCompare(b.deadline||"9999"))}
+else if(sortBy==="category")l.sort((a,b)=>(a.cat||"").localeCompare(b.cat||"")||(a.deadline||"9999").localeCompare(b.deadline||"9999"));
+else if(sortBy==="created")l.sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||""));
+return l},[data.tasks,data.priorities,filter,sortBy,now]);
 
 const todayL=useMemo(()=>data.tasks.filter(t=>{if(!t.name)return false;const st=getS(t,now);if(st.l==="Выполнено")return false;if(!t.start||t.start>now)return false;if(st.l==="Просрочено")return true;if(!t.deadline||t.deadline>=now)return true;return false}).sort((a,b)=>{const o={};data.priorities.forEach((p,i)=>o[p]=i);return(o[a.pri]??99)-(o[b.pri]??99)}),[data.tasks,data.priorities,now]);
 
@@ -453,14 +497,171 @@ const catBr={};expFiltered.forEach(t=>{catBr[t.cat]=(catBr[t.cat]||0)+1});
 const priBr={};expFiltered.forEach(t=>{priBr[t.pri]=(priBr[t.pri]||0)+1});
 const done=expFiltered.filter(t=>getS(t,now).l==="Выполнено");
 const active=expFiltered.filter(t=>getS(t,now).l!=="Выполнено");
-const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap');*{margin:0;padding:0;box-sizing:border-box;font-family:'DM Sans',sans-serif}body{padding:40px;color:#1E293B;font-size:13px;line-height:1.6;background:#fff}@media print{body{padding:20px}@page{margin:15mm;size:A4}}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #4361EE}.logo{font-size:22px;font-weight:800;color:#4361EE}.logo small{display:block;font-size:12px;font-weight:500;color:#94A3B8}.period{text-align:right;font-size:12px;color:#64748B}.period strong{display:block;font-size:14px;color:#1E293B}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px}.kpi-box{border:1.5px solid #E2E8F0;border-radius:10px;padding:14px;text-align:center}.kpi-box .num{font-size:28px;font-weight:800;font-family:'IBM Plex Mono',monospace}.kpi-box .lbl{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:1px;margin-top:2px}.blue{color:#4361EE;border-color:#4361EE20}.grn{color:#10B981;border-color:#10B98120}.amb{color:#F59E0B;border-color:#F59E0B20}.red{color:#EF4444;border-color:#EF444420}.section{margin-bottom:24px}.section h2{font-size:15px;font-weight:700;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #F0F4FA}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#F0F4FA;color:#475569;font-weight:700;text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase}td{padding:9px 12px;border-bottom:1px solid #F0F4FA}.bdg{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600}.footer{margin-top:30px;padding-top:14px;border-top:2px solid #F0F4FA;font-size:11px;color:#94A3B8;display:flex;justify-content:space-between}.summary-box{background:#F0F4FA;border-radius:10px;padding:16px;margin-bottom:20px}.bar-section{display:flex;gap:20px;margin-bottom:20px}.bar-group{flex:1}.bar-item{margin-bottom:8px}.bar-label-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}.bar-track{height:8px;background:#F0F4FA;border-radius:4px;overflow:hidden}.bar-inner{height:100%;border-radius:4px}</style></head><body>
-<div class="header"><div class="logo">Smart Planner<small>Отчёт по задачам</small></div><div class="period"><strong>${fmt(expFrom)} \u2014 ${fmt(expTo)}</strong>Сформировано: ${fmt(now)}</div></div>
-<div class="kpis"><div class="kpi-box blue"><div class="num">${expStats.total}</div><div class="lbl">Всего</div></div><div class="kpi-box grn"><div class="num">${expStats.done}</div><div class="lbl">Выполнено</div></div><div class="kpi-box blue"><div class="num">${expStats.pct}%</div><div class="lbl">Завершение</div></div><div class="kpi-box amb"><div class="num">${expStats.avgProg}%</div><div class="lbl">Ср. прогресс</div></div><div class="kpi-box red"><div class="num">${expStats.overdue}</div><div class="lbl">Просрочено</div></div></div>
-<div class="summary-box"><div style="font-weight:700;margin-bottom:6px">Сводка</div><div>За период ${fmt(expFrom)} \u2014 ${fmt(expTo)} было ${expStats.total} задач. Из них выполнено ${expStats.done} (${expStats.pct}%). Средний прогресс составил ${expStats.avgProg}%. ${expStats.overdue>0?'Просрочено '+expStats.overdue+' задач.':'Просроченных нет.'}</div></div>
-<div class="bar-section"><div class="bar-group"><div style="font-weight:700;font-size:12px;margin-bottom:10px">По категориям</div>${Object.entries(catBr).sort((a,b)=>b[1]-a[1]).map(([c,n])=>'<div class="bar-item"><div class="bar-label-row"><span style="font-weight:600">'+c+'</span><span style="font-family:IBM Plex Mono;font-weight:700">'+n+'</span></div><div class="bar-track"><div class="bar-inner" style="width:'+(n/expStats.total*100)+'%;background:'+(CC[c]||'#64748B')+'"></div></div></div>').join('')}</div><div class="bar-group"><div style="font-weight:700;font-size:12px;margin-bottom:10px">По приоритетам</div>${Object.entries(priBr).sort((a,b)=>b[1]-a[1]).map(([p,n])=>'<div class="bar-item"><div class="bar-label-row"><span style="font-weight:600">'+p+'</span><span style="font-family:IBM Plex Mono;font-weight:700">'+n+'</span></div><div class="bar-track"><div class="bar-inner" style="width:'+(n/expStats.total*100)+'%;background:'+(PC[p]||'#64748B')+'"></div></div></div>').join('')}</div></div>
-${done.length?'<div class="section"><h2>\u2705 Выполненные задачи ('+done.length+')</h2><table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Завершено</th></tr></thead><tbody>'+done.map(t=>'<tr><td><strong>'+t.name+'</strong>'+(t.desc?'<br><span style="color:#94A3B8;font-size:11px">'+t.desc+'</span>':'')+'</td><td><span class="bdg" style="color:'+gc(t.cat)+';background:'+gc(t.cat)+'15">'+t.cat+'</span></td><td><span class="bdg" style="color:'+gp(t.pri)+';background:'+gp(t.pri)+'15">'+t.pri+'</span></td><td>'+fmt(t.completedAt)+'</td></tr>').join('')+'</tbody></table></div>':''}
-${active.length?'<div class="section"><h2>\ud83d\udd04 Активные задачи ('+active.length+')</h2><table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Статус</th><th>Прогресс</th><th>Дедлайн</th></tr></thead><tbody>'+active.map(t=>{const st=getS(t,now);return'<tr><td><strong>'+t.name+'</strong>'+(t.desc?'<br><span style="color:#94A3B8;font-size:11px">'+t.desc+'</span>':'')+'</td><td><span class="bdg" style="color:'+gc(t.cat)+';background:'+gc(t.cat)+'15">'+t.cat+'</span></td><td><span class="bdg" style="color:'+gp(t.pri)+';background:'+gp(t.pri)+'15">'+t.pri+'</span></td><td style="font-weight:600">'+st.i+' '+st.l+'</td><td><span style="font-family:IBM Plex Mono;font-weight:600">'+t.progress+'%</span></td><td>'+fmt(t.deadline)+'</td></tr>'}).join('')+'</tbody></table></div>':''}
-<div class="footer"><span>Smart Planner \u2014 автоматический отчёт</span><span>${fmt(now)}</span></div></body></html>`;
+const overdue=expFiltered.filter(t=>getS(t,now).l==="Просрочено");
+const burning=expFiltered.filter(t=>getS(t,now).l==="Горит");
+const inprog=expFiltered.filter(t=>getS(t,now).l==="В работе");
+
+/* Advanced metrics */
+const onTimeDone=done.filter(t=>!t.deadline||t.completedAt<=t.deadline).length;
+const onTimeRate=done.length?Math.round(onTimeDone/done.length*100):null;
+const latDone=done.filter(t=>t.deadline&&t.completedAt>t.deadline).length;
+const avgTimeDays=(()=>{const ts=done.filter(t=>t.completedAt&&t.start);if(!ts.length)return null;return Math.round(ts.reduce((s,t)=>s+Math.max(0,diffD(t.completedAt,t.start)),0)/ts.length*10)/10})();
+const avgProg=expStats.avgProg;
+
+/* Status breakdown */
+const statuses=[
+{label:"Выполнено",count:done.length,color:"#10B981",icon:"✓"},
+{label:"В работе",count:inprog.length,color:"#4361EE",icon:"⟳"},
+{label:"Горит",count:burning.length,color:"#F59E0B",icon:"⚠"},
+{label:"Просрочено",count:overdue.length,color:"#EF4444",icon:"✕"},
+].filter(s=>s.count>0);
+
+/* Assessment */
+const assessment=expStats.pct>=75?{text:"🏆 Отличный результат",color:"#10B981"}:expStats.pct>=50?{text:"✓ Хороший прогресс",color:"#4361EE"}:expStats.pct>=25?{text:"⚠ Требуется внимание",color:"#F59E0B"}:{text:"⚠ Низкая эффективность",color:"#EF4444"};
+
+const escapeHTML=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+const taskRow=(t,showDeadline=false)=>{const st=getS(t,now);return `<tr><td><strong>${escapeHTML(t.name)}</strong>${t.desc?'<div style="color:#64748B;font-size:11px;margin-top:2px">'+escapeHTML(t.desc)+'</div>':''}</td><td><span class="bdg" style="color:${gc(t.cat)};background:${gc(t.cat)}15">${escapeHTML(t.cat)}</span></td><td><span class="bdg" style="color:${gp(t.pri)};background:${gp(t.pri)}15">${escapeHTML(t.pri)}</span></td>${showDeadline?`<td>${fmt(t.deadline)}</td>`:''}<td style="color:${st.c==='var(--green)'?'#10B981':st.c==='var(--red)'?'#EF4444':st.c==='var(--amber)'?'#F59E0B':'#4361EE'};font-weight:600">${st.i} ${st.l}</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:#F0F4FA;border-radius:4px;overflow:hidden;min-width:60px"><div style="width:${t.progress}%;height:100%;background:${st.c==='var(--green)'?'#10B981':st.c==='var(--red)'?'#EF4444':st.c==='var(--amber)'?'#F59E0B':'#4361EE'}"></div></div><span style="font-family:'IBM Plex Mono';font-weight:700;font-size:11px;min-width:32px;text-align:right">${t.progress}%</span></div></td>${t.completedAt?`<td style="color:#10B981;font-weight:600">${fmt(t.completedAt)}</td>`:''}</tr>`};
+
+const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Отчёт Smart Planner</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;font-family:'DM Sans',sans-serif}
+body{padding:40px;color:#1E293B;font-size:13px;line-height:1.6;background:#fff}
+@media print{body{padding:20px}@page{margin:15mm;size:A4}.page-break{page-break-before:always}.no-break{page-break-inside:avoid}}
+.header{position:relative;margin-bottom:32px;padding:28px;background:linear-gradient(135deg,#4361EE 0%,#7C3AED 100%);border-radius:16px;color:#fff;overflow:hidden}
+.header::before{content:"";position:absolute;top:-50%;right:-10%;width:300px;height:300px;border-radius:50%;background:rgba(255,255,255,.1);filter:blur(40px)}
+.header::after{content:"";position:absolute;bottom:-30%;left:-5%;width:200px;height:200px;border-radius:50%;background:rgba(236,72,153,.25);filter:blur(40px)}
+.header-content{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.header h1{font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px}
+.header .subtitle{font-size:14px;font-weight:500;opacity:.85}
+.header .period{text-align:right}
+.header .period .label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;opacity:.7;margin-bottom:4px}
+.header .period .dates{font-size:16px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.header .period .gen{font-size:11px;opacity:.7;margin-top:6px}
+.assess-box{margin-bottom:24px;padding:20px 24px;border-radius:14px;border-left:5px solid ${assessment.color};background:${assessment.color}12;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.assess-box .main-text{font-size:18px;font-weight:700;color:${assessment.color}}
+.assess-box .sub{font-size:12px;color:#64748B;margin-top:4px}
+.assess-box .big-pct{font-size:36px;font-weight:800;color:${assessment.color};font-family:'IBM Plex Mono',monospace}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:24px}
+.kpi-box{border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 12px;text-align:center;position:relative;background:#fff}
+.kpi-box::before{content:"";position:absolute;top:0;left:12%;right:12%;height:3px;border-radius:0 0 4px 4px}
+.kpi-box .num{font-size:24px;font-weight:800;font-family:'IBM Plex Mono',monospace;line-height:1}
+.kpi-box .lbl{font-size:9px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.8px;margin-top:8px}
+.kpi-box .sub{font-size:10px;color:#94A3B8;margin-top:2px}
+.blue{color:#4361EE}.blue::before{background:#4361EE}.grn{color:#10B981}.grn::before{background:#10B981}.amb{color:#F59E0B}.amb::before{background:#F59E0B}.red{color:#EF4444}.red::before{background:#EF4444}.cyan{color:#0891B2}.cyan::before{background:#06B6D4}.pnk{color:#DB2777}.pnk::before{background:#EC4899}
+.summary{background:#F8FAFD;border:1px solid #E2E8F0;border-radius:14px;padding:20px 22px;margin-bottom:28px}
+.summary-title{font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;font-size:13px}
+.summary-item{padding:10px 0;border-bottom:1px dashed #E2E8F0}
+.summary-item:last-child{border-bottom:none}
+.summary-item .sum-label{color:#64748B;font-size:12px;margin-bottom:2px}
+.summary-item .sum-value{font-weight:700;color:#1E293B}
+.sum-value.pos{color:#10B981}.sum-value.neg{color:#EF4444}.sum-value.warn{color:#F59E0B}
+.narrative{margin-top:16px;padding:14px 16px;background:#fff;border-radius:10px;border:1px solid #E2E8F0;color:#475569;line-height:1.7;font-size:13px}
+.section{margin-bottom:28px}
+.section h2{font-size:16px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #E2E8F0;color:#1E293B;display:flex;align-items:center;gap:8px}
+.section h2 .count{font-size:12px;color:#94A3B8;font-weight:500;margin-left:auto;font-family:'IBM Plex Mono',monospace}
+.stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.stat-card{padding:16px;background:#F8FAFD;border-radius:12px;text-align:center;border:1px solid #E2E8F0}
+.stat-card .v{font-size:22px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:#4361EE}
+.stat-card .lb{font-size:10px;color:#64748B;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+.bar-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
+.bar-group{background:#F8FAFD;border-radius:12px;padding:18px;border:1px solid #E2E8F0}
+.bar-group-title{font-weight:700;font-size:12px;margin-bottom:14px;text-transform:uppercase;letter-spacing:.8px;color:#475569}
+.bar-item{margin-bottom:10px}
+.bar-label-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;align-items:center}
+.bar-track{height:10px;background:#E2E8F0;border-radius:5px;overflow:hidden}
+.bar-inner{height:100%;border-radius:5px;transition:width .5s}
+.status-row{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.status-pill{flex:1;min-width:140px;padding:12px 14px;border-radius:10px;display:flex;align-items:center;gap:10px;font-size:12px;border:1px solid}
+.status-pill .sp-icon{font-size:20px;font-weight:700}
+.status-pill .sp-count{font-size:20px;font-weight:800;font-family:'IBM Plex Mono',monospace}
+.status-pill .sp-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;opacity:.8}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden}
+th{background:#F0F4FA;color:#475569;font-weight:700;text-align:left;padding:11px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #E2E8F0}
+td{padding:11px 12px;border-bottom:1px solid #F0F4FA;vertical-align:top}
+tr:last-child td{border-bottom:none}
+.bdg{display:inline-block;padding:3px 9px;border-radius:6px;font-size:10px;font-weight:600;white-space:nowrap}
+.footer{margin-top:40px;padding-top:20px;border-top:2px solid #E2E8F0;font-size:11px;color:#94A3B8;display:flex;justify-content:space-between;align-items:center}
+.footer .logo-footer{font-weight:700;color:#4361EE;display:flex;align-items:center;gap:6px}
+</style></head><body>
+
+<div class="header">
+<div class="header-content">
+<div><h1>⚡ Smart Planner</h1><div class="subtitle">Отчёт о выполнении задач</div></div>
+<div class="period">
+<div class="label">Отчётный период</div>
+<div class="dates">${fmt(expFrom)} — ${fmt(expTo)}</div>
+<div class="gen">Сформировано: ${fmt(now)}</div>
+</div></div></div>
+
+<div class="assess-box">
+<div><div class="main-text">${assessment.text}</div><div class="sub">Коэффициент завершения задач за отчётный период</div></div>
+<div class="big-pct">${expStats.pct}%</div>
+</div>
+
+<div class="kpis">
+<div class="kpi-box blue"><div class="num">${expStats.total}</div><div class="lbl">Всего</div><div class="sub">задач</div></div>
+<div class="kpi-box grn"><div class="num">${done.length}</div><div class="lbl">Выполнено</div><div class="sub">завершены</div></div>
+<div class="kpi-box blue"><div class="num">${inprog.length}</div><div class="lbl">В работе</div><div class="sub">активных</div></div>
+<div class="kpi-box amb"><div class="num">${burning.length}</div><div class="lbl">Горит</div><div class="sub">≤ 2 дня</div></div>
+<div class="kpi-box red"><div class="num">${overdue.length}</div><div class="lbl">Просрочено</div><div class="sub">срок вышел</div></div>
+<div class="kpi-box pnk"><div class="num">${avgProg}%</div><div class="lbl">Прогресс</div><div class="sub">средний</div></div>
+</div>
+
+<div class="summary">
+<div class="summary-title">📊 Подробная сводка</div>
+<div class="summary-grid">
+<div class="summary-item"><div class="sum-label">Всего задач в отчёте</div><div class="sum-value">${expStats.total}</div></div>
+<div class="summary-item"><div class="sum-label">Коэффициент завершения</div><div class="sum-value ${expStats.pct>=70?'pos':expStats.pct>=40?'warn':'neg'}">${expStats.pct}% (${done.length} из ${expStats.total})</div></div>
+<div class="summary-item"><div class="sum-label">Средний прогресс</div><div class="sum-value">${avgProg}%</div></div>
+<div class="summary-item"><div class="sum-label">Активных задач</div><div class="sum-value">${active.length}</div></div>
+<div class="summary-item"><div class="sum-label">Задач в критической зоне</div><div class="sum-value ${burning.length+overdue.length>0?'warn':'pos'}">${burning.length+overdue.length} (горит ${burning.length} + просрочено ${overdue.length})</div></div>
+<div class="summary-item"><div class="sum-label">Пунктуальность</div><div class="sum-value ${onTimeRate===null?'':onTimeRate>=80?'pos':onTimeRate>=50?'warn':'neg'}">${onTimeRate!==null?onTimeRate+'% задач выполнено в срок':'нет завершённых для оценки'}</div></div>
+<div class="summary-item"><div class="sum-label">Скорость выполнения</div><div class="sum-value">${avgTimeDays!==null?avgTimeDays+' дн. в среднем на задачу':'нет данных'}</div></div>
+<div class="summary-item"><div class="sum-label">Задач с нарушением срока</div><div class="sum-value ${latDone>0?'warn':'pos'}">${latDone} ${latDone>0?'(сдано с опозданием)':''}</div></div>
+</div>
+<div class="narrative">
+<strong>Ключевые выводы:</strong> За отчётный период с ${fmt(expFrom)} по ${fmt(expTo)} было обработано <strong>${expStats.total}</strong> задач. Из них <strong>${done.length}</strong> успешно завершены (${expStats.pct}% от общего числа). ${onTimeRate!==null?'В срок выполнено <strong>'+onTimeRate+'%</strong> из завершённых задач. ':''}${avgTimeDays!==null?'Средняя продолжительность выполнения — <strong>'+avgTimeDays+'</strong> дн. ':''}
+${overdue.length>0?'⚠ <strong>Требуют особого внимания:</strong> '+overdue.length+' просроченных задач. ':''}
+${burning.length>0?'🔥 <strong>Приближаются дедлайны:</strong> '+burning.length+' горящих задач. ':''}
+${overdue.length===0&&burning.length===0?'✓ Критических задач не обнаружено — все сроки под контролем. ':''}
+${expStats.pct>=75?'Команда демонстрирует высокую эффективность.':expStats.pct>=50?'Результаты в пределах нормы, есть потенциал для роста.':'Необходимо пересмотреть распределение ресурсов и приоритеты.'}
+</div></div>
+
+<div class="section no-break">
+<h2>📈 Распределение по статусам <span class="count">${expStats.total} задач</span></h2>
+<div class="status-row">
+${statuses.map(s=>`<div class="status-pill" style="background:${s.color}0F;border-color:${s.color}40;color:${s.color}"><div class="sp-icon">${s.icon}</div><div><div class="sp-count">${s.count}</div><div class="sp-label">${s.label} · ${Math.round(s.count/expStats.total*100)}%</div></div></div>`).join('')}
+</div></div>
+
+${expStats.total>0?`<div class="section no-break">
+<h2>🔀 Структура задач</h2>
+<div class="bar-section">
+<div class="bar-group"><div class="bar-group-title">🏷️ По категориям</div>
+${Object.entries(catBr).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<div class="bar-item"><div class="bar-label-row"><span style="font-weight:600;color:${CC[c]||'#64748B'}">${escapeHTML(c)}</span><span style="font-family:IBM Plex Mono;font-weight:700">${n} · ${Math.round(n/expStats.total*100)}%</span></div><div class="bar-track"><div class="bar-inner" style="width:${(n/expStats.total)*100}%;background:${CC[c]||'#64748B'}"></div></div></div>`).join('')}
+</div>
+<div class="bar-group"><div class="bar-group-title">🎯 По приоритетам</div>
+${Object.entries(priBr).sort((a,b)=>b[1]-a[1]).map(([p,n])=>`<div class="bar-item"><div class="bar-label-row"><span style="font-weight:600;color:${PC[p]||'#64748B'}">${escapeHTML(p)}</span><span style="font-family:IBM Plex Mono;font-weight:700">${n} · ${Math.round(n/expStats.total*100)}%</span></div><div class="bar-track"><div class="bar-inner" style="width:${(n/expStats.total)*100}%;background:${PC[p]||'#64748B'}"></div></div></div>`).join('')}
+</div></div></div>`:''}
+
+${overdue.length?`<div class="section page-break"><h2 style="color:#EF4444">⚠ Просроченные задачи <span class="count">${overdue.length}</span></h2>
+<table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Дедлайн</th><th>Статус</th><th>Прогресс</th></tr></thead><tbody>${overdue.map(t=>taskRow(t,true)).join('')}</tbody></table></div>`:''}
+
+${burning.length?`<div class="section"><h2 style="color:#F59E0B">🔥 Горящие задачи <span class="count">${burning.length}</span></h2>
+<table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Дедлайн</th><th>Статус</th><th>Прогресс</th></tr></thead><tbody>${burning.map(t=>taskRow(t,true)).join('')}</tbody></table></div>`:''}
+
+${inprog.length?`<div class="section"><h2 style="color:#4361EE">⟳ Задачи в работе <span class="count">${inprog.length}</span></h2>
+<table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Дедлайн</th><th>Статус</th><th>Прогресс</th></tr></thead><tbody>${inprog.map(t=>taskRow(t,true)).join('')}</tbody></table></div>`:''}
+
+${done.length?`<div class="section page-break"><h2 style="color:#10B981">✓ Выполненные задачи <span class="count">${done.length}</span></h2>
+<table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Статус</th><th>Прогресс</th><th>Завершено</th></tr></thead><tbody>${done.map(t=>taskRow(t,false)).join('')}</tbody></table></div>`:''}
+
+<div class="footer">
+<div class="logo-footer">⚡ Smart Planner</div>
+<div>Автоматический отчёт · ${fmt(now)}</div>
+</div></body></html>`;
 setExpPreview(html);setExpGen(false)},200)};
 
 const printReport=async()=>{if(!expPreview)return;await callApi("save_pdf_report",expPreview)};
@@ -474,7 +675,13 @@ return<div>
 
 <div className="main">
 {/* ПАНЕЛЬ */}
-{tab==="Панель"&&<><div className="kpi-r"><KPI label="Всего" value={stats.total} sub="задач" color="var(--accent)"/><KPI label="Выполнено" value={stats.done} sub={`${stats.pct}%`} color="var(--green)"/><KPI label="В работе" value={stats.active} sub="активных" color="var(--accent)"/><KPI label="Горит" value={stats.burn} sub="≤ 2 дня" color="var(--amber)"/><KPI label="Просрочено" value={stats.over} sub="срок вышел" color="var(--red)"/></div>
+{tab==="Панель"&&<><div className="kpi-r">
+<div className="kpi" style={{cursor:"pointer"}} onClick={()=>setDrillKpi("total")}><div className="kpi-glow" style={{background:"var(--accent)"}}/><div className="kpi-l">Всего</div><div className="kpi-v" style={{color:"var(--accent)"}}>{stats.total}</div><div className="kpi-s">задач · клик для списка</div></div>
+<div className="kpi" style={{cursor:"pointer"}} onClick={()=>setDrillKpi("done")}><div className="kpi-glow" style={{background:"var(--green)"}}/><div className="kpi-l">Выполнено</div><div className="kpi-v" style={{color:"var(--green)"}}>{stats.done}</div><div className="kpi-s">{stats.pct}% · клик для списка</div></div>
+<div className="kpi" style={{cursor:"pointer"}} onClick={()=>setDrillKpi("active")}><div className="kpi-glow" style={{background:"var(--accent)"}}/><div className="kpi-l">В работе</div><div className="kpi-v" style={{color:"var(--accent)"}}>{stats.active}</div><div className="kpi-s">активных · клик</div></div>
+<div className="kpi" style={{cursor:"pointer"}} onClick={()=>setDrillKpi("burn")}><div className="kpi-glow" style={{background:"var(--amber)"}}/><div className="kpi-l">Горит</div><div className="kpi-v" style={{color:"var(--amber)"}}>{stats.burn}</div><div className="kpi-s">≤ 2 дня · клик</div></div>
+<div className="kpi" style={{cursor:"pointer"}} onClick={()=>setDrillKpi("over")}><div className="kpi-glow" style={{background:"var(--red)"}}/><div className="kpi-l">Просрочено</div><div className="kpi-v" style={{color:"var(--red)"}}>{stats.over}</div><div className="kpi-s">срок вышел · клик</div></div>
+</div>
 <div className="card card-glow" style={{marginBottom:22}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span className="stitle" style={{margin:0}}>🚀 Общий прогресс</span><span style={{fontWeight:800,fontSize:22,color:"var(--accent)",fontFamily:"var(--mono)"}}>{stats.pct}%</span></div><PBar value={stats.pct} size={12} color="var(--accent)"/></div>
 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:22}} className="two-col">
 <div className="card"><div className="stitle"><span className="stitle-icon">🎯</span> По приоритетам</div>{data.priorities.map(p=>{const c=data.tasks.filter(t=>t.name&&t.pri===p).length;return<div key={p} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--border)"}}><Bdg color={gp(p)} bg={gb(p)}>{p}</Bdg><span style={{fontWeight:800,fontSize:18,color:gp(p),fontFamily:"var(--mono)"}}>{c}</span></div>})}</div>
@@ -484,7 +691,7 @@ return<div>
 
 {/* ЗАДАЧИ */}
 {tab==="Задачи"&&<><div className="filter-bar"><div className="seg">{[["active","Активные"],["all","Все"],["completed","Готовые"]].map(([k,l])=><button key={k} className={filter===k?"on":""} onClick={()=>setFilter(k)}>{l}</button>)}</div>
-<select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:12,background:"var(--bg3)",color:"var(--text)"}}><option value="deadline">По дедлайну</option><option value="priority">По приоритету</option></select>
+<select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:12,background:"var(--bg3)",color:"var(--text)"}}><option value="deadline">По дедлайну</option><option value="priority">По приоритету</option><option value="category">По категории</option><option value="created">По дате создания</option></select>
 <span style={{fontSize:12,color:"var(--text4)",marginLeft:"auto"}}>{filtered.length} задач</span></div>
 <div style={{display:"flex",flexDirection:"column",gap:6}}>{filtered.map(t=>{const st=getS(t,now);const dl=t.deadline?diffD(t.deadline,now):null;const isMtg=t.cat==="Совещание";
 return<div key={t.id} className={`tr ${st.l==="Выполнено"?"done":""}`} onClick={()=>setDetailTask(t)}><div className="task-left" style={{background:gp(t.pri)}}/><div style={{flex:1,minWidth:0}}>
@@ -536,31 +743,235 @@ return completed.map((t,i)=><tr key={t.id||i} style={{background:i%2===0?"#FFFFF
 {Array.from({length:daysInM},(_,di)=>{const dk=`${habMonth}-${String(di+1).padStart(2,"0")}`;return<td key={di} style={{textAlign:"center",padding:2}}>{t.completedAt===dk&&<span style={{display:"inline-flex",width:28,height:28,borderRadius:8,background:"var(--gradient2)",color:"#fff",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700}}>✓</span>}</td>})}
 </tr>)})()}</tbody></table></div></>}
 
-{/* АНАЛИТИКА — simplified inline for space */}
-{tab==="Аналитика"&&<div>
-<div style={{fontSize:20,fontWeight:800,marginBottom:16}}>📈 Аналитика</div>
-<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
-<KPI label="Всего" value={stats.total} sub="задач" color="var(--accent)"/>
-<KPI label="Выполнено" value={stats.done} sub={`${stats.pct}%`} color="var(--green)"/>
-<KPI label="Ср. прогресс" value={`${data.tasks.length?Math.round(data.tasks.reduce((a,t)=>a+(t.progress||0),0)/data.tasks.length):0}%`} sub="по всем" color="var(--amber)"/>
-<KPI label="Просрочено" value={stats.over} sub="задач" color="var(--red)"/>
-</div>
-<div className="analytics-grid">
-<div className="chart-card"><div className="chart-title" style={{fontWeight:700,marginBottom:16}}>📊 Статусы</div>
-{(()=>{const segs=[{l:"Выполнено",v:stats.done,c:"var(--green)"},{l:"В работе",v:stats.active,c:"var(--accent)"},{l:"Горит",v:stats.burn,c:"var(--amber)"},{l:"Просрочено",v:stats.over,c:"var(--red)"}].filter(s=>s.v>0);const tot=segs.reduce((a,s)=>a+s.v,0);
-return tot?<div className="donut-container"><DonutChart segments={segs.map(s=>({...s,value:s.v,pct:s.v/tot*100}))} size={150} thickness={26}/><div className="donut-legend">{segs.map(s=><div key={s.l} className="donut-legend-item"><div className="donut-legend-dot" style={{background:s.c}}/><span>{s.l}</span><span style={{fontFamily:"var(--mono)",fontWeight:700,marginLeft:"auto",paddingLeft:12}}>{s.v}</span></div>)}</div></div>:<div style={{textAlign:"center",padding:30,color:"var(--text4)"}}>Нет данных</div>})()}</div>
-<div className="chart-card"><div className="chart-title" style={{fontWeight:700,marginBottom:16}}>🏷️ По категориям</div>
-{(()=>{const cd={};data.tasks.forEach(t=>{if(t.name)cd[t.cat]=(cd[t.cat]||0)+1});const entries=Object.entries(cd).sort((a,b)=>b[1]-a[1]);const mx=Math.max(...entries.map(e=>e[1]),1);
-return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key={c} className="bar-col"><div className="bar-value">{n}</div><div className="bar-fill" style={{height:`${(n/mx)*100}%`,background:gc(c),minHeight:4}}/><div className="bar-label">{c}</div></div>)}</div>:<div style={{textAlign:"center",padding:30,color:"var(--text4)"}}>Нет данных</div>})()}</div>
-<div className="chart-card"><div className="chart-title" style={{fontWeight:700,marginBottom:16}}>🎯 По приоритетам</div>
-{data.priorities.map(p=>{const c=data.tasks.filter(t=>t.name&&t.pri===p).length;const tot=data.tasks.filter(t=>t.name).length||1;return<div key={p} style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:600,color:gp(p)}}>{p}</span><span style={{fontSize:12,fontWeight:700,fontFamily:"var(--mono)"}}>{c}</span></div><div style={{width:"100%",height:10,background:"var(--bg4)",borderRadius:6,overflow:"hidden"}}><div style={{width:`${(c/tot)*100}%`,height:"100%",background:gp(p),borderRadius:6}}/></div></div>})}</div>
-<div className="chart-card"><div className="chart-title" style={{fontWeight:700,marginBottom:16}}>⚡ Продуктивность</div>
-<div className="stat-row"><span style={{color:"var(--text2)"}}>Всего задач</span><span style={{fontWeight:700,fontFamily:"var(--mono)"}}>{stats.total}</span></div>
-<div className="stat-row"><span style={{color:"var(--text2)"}}>Завершено</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--green)"}}>{stats.done}</span></div>
-<div className="stat-row"><span style={{color:"var(--text2)"}}>Коэф. завершения</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:stats.pct>=70?"var(--green)":stats.pct>=40?"var(--amber)":"var(--red)"}}>{stats.pct}%</span></div>
-<div className="stat-row"><span style={{color:"var(--text2)"}}>Просрочено</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--red)"}}>{stats.over}</span></div>
-</div>
+{/* АНАЛИТИКА — мощный инструмент */}
+{tab==="Аналитика"&&(()=>{
+/* Filter tasks by period */
+const anFiltered=data.tasks.filter(t=>{
+if(!t.name)return false;
+if(anCat&&t.cat!==anCat)return false;
+if(anPri&&t.pri!==anPri)return false;
+if(anPeriod==="all")return true;
+const nd=new Date();let from;
+if(anPeriod==="week"){from=new Date(nd);from.setDate(from.getDate()-7)}
+else if(anPeriod==="month"){from=new Date(nd);from.setMonth(from.getMonth()-1)}
+else if(anPeriod==="quarter"){from=new Date(nd);from.setMonth(from.getMonth()-3)}
+else if(anPeriod==="year"){from=new Date(nd);from.setFullYear(from.getFullYear()-1)}
+const fISO=from.toISOString().split("T")[0];
+return(t.start&&t.start>=fISO)||(t.deadline&&t.deadline>=fISO)||(t.completedAt&&t.completedAt>=fISO)||(t.createdAt&&t.createdAt>=fISO);
+});
+
+const anStats={total:0,done:0,active:0,burn:0,over:0,newT:0};
+anFiltered.forEach(t=>{anStats.total++;const st=getS(t,now).l;
+if(st==="Выполнено")anStats.done++;
+else if(st==="Просрочено")anStats.over++;
+else if(st==="Горит")anStats.burn++;
+else if(st==="В работе")anStats.active++;
+else anStats.newT++});
+const anPct=anStats.total?Math.round(anStats.done/anStats.total*100):0;
+const anAvgProg=anStats.total?Math.round(anFiltered.reduce((a,t)=>a+(t.progress||0),0)/anStats.total):0;
+
+/* On-time rate: завершено до дедлайна */
+const onTimeRate=(()=>{
+const completed=anFiltered.filter(t=>t.completedAt);
+if(!completed.length)return null;
+const onTime=completed.filter(t=>!t.deadline||t.completedAt<=t.deadline).length;
+return Math.round(onTime/completed.length*100);
+})();
+
+/* Average completion time (days from start to completedAt) */
+const avgCompTime=(()=>{
+const done=anFiltered.filter(t=>t.completedAt&&t.start);
+if(!done.length)return null;
+const total=done.reduce((s,t)=>s+Math.max(0,diffD(t.completedAt,t.start)),0);
+return Math.round(total/done.length*10)/10;
+})();
+
+/* Heatmap 12 weeks */
+const heatmap=[];
+for(let w=11;w>=0;w--){const week=[];for(let d=0;d<7;d++){const dt=new Date();dt.setDate(dt.getDate()-w*7-d);const ds=dt.toISOString().split("T")[0];const count=data.tasks.filter(t=>t.completedAt===ds).length;week.push({date:ds,count})}heatmap.push(week)}
+const maxHeat=Math.max(...heatmap.flat().map(c=>c.count),1);
+
+/* Timeline 14 days */
+const timeline=[];
+for(let i=13;i>=0;i--){const dt=new Date();dt.setDate(dt.getDate()-i);const ds=dt.toISOString().split("T")[0];
+timeline.push({day:ds,created:data.tasks.filter(t=>t.createdAt&&t.createdAt.startsWith(ds)).length,completed:data.tasks.filter(t=>t.completedAt===ds).length})}
+const maxTL=Math.max(...timeline.map(d=>Math.max(d.created,d.completed)),1);
+
+/* Upcoming deadlines (next 7 days) */
+const upcoming=data.tasks.filter(t=>{const st=getS(t,now).l;if(st==="Выполнено")return false;if(!t.deadline)return false;const dl=diffD(t.deadline,now);return dl>=0&&dl<=7}).sort((a,b)=>(a.deadline||"").localeCompare(b.deadline||""));
+
+/* Category x Priority matrix */
+const catPri={};data.categories.forEach(c=>{catPri[c]={};data.priorities.forEach(p=>{catPri[c][p]=anFiltered.filter(t=>t.cat===c&&t.pri===p).length})});
+
+/* Avg progress per category */
+const apc={};data.categories.forEach(c=>{const ts=anFiltered.filter(t=>t.cat===c);apc[c]=ts.length?Math.round(ts.reduce((a,t)=>a+(t.progress||0),0)/ts.length):0});
+
+const statusSegs=[
+{label:"Выполнено",value:anStats.done,color:"#10B981"},
+{label:"В работе",value:anStats.active,color:"#4361EE"},
+{label:"Горит",value:anStats.burn,color:"#F59E0B"},
+{label:"Просрочено",value:anStats.over,color:"#EF4444"},
+{label:"Новая",value:anStats.newT,color:"#94A3B8"},
+].filter(s=>s.value>0).map(s=>({...s,pct:anStats.total?s.value/anStats.total*100:0}));
+
+const chartNames={kpis:"KPI метрики",status:"Статусы",category:"Категории",priority:"Приоритеты",productivity:"Продуктивность",timeline:"Таймлайн 14 дней",heatmap:"Тепловая карта",catPri:"Матрица кат×приор",avgProg:"Прогресс по кат.",completion:"Скорость",onTime:"Пунктуальность",upcoming:"Ближайшие дедлайны"};
+
+return<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,flexWrap:"wrap",gap:12}}>
+<div><div style={{fontSize:22,fontWeight:800}}>📈 Аналитика</div><div style={{color:"var(--text3)",fontSize:13,marginTop:2}}>Мощный инструмент анализа задач · {anFiltered.length} в выборке</div></div>
+<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+<div className="seg">{[["all","Всё время"],["week","Неделя"],["month","Месяц"],["quarter","Квартал"],["year","Год"]].map(([k,l])=><button key={k} className={anPeriod===k?"on":""} onClick={()=>setAnPeriod(k)}>{l}</button>)}</div>
+<select value={anCat} onChange={e=>setAnCat(e.target.value)} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:12,background:"#fff"}}>
+<option value="">Все категории</option>{data.categories.map(c=><option key={c}>{c}</option>)}
+</select>
+<select value={anPri} onChange={e=>setAnPri(e.target.value)} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:12,background:"#fff"}}>
+<option value="">Все приоритеты</option>{data.priorities.map(p=><option key={p}>{p}</option>)}
+</select>
+<button className="bo" onClick={()=>setAnShowSettings(!anShowSettings)}>⚙️ Виджеты</button>
+</div></div>
+
+{anShowSettings&&<div className="card" style={{marginBottom:16,padding:16}}>
+<div className="stitle" style={{marginBottom:10}}>Управление виджетами</div>
+<div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+{Object.entries(chartNames).map(([k,nm])=><button key={k} onClick={()=>setAnCharts(p=>({...p,[k]:!p[k]}))} style={{padding:"6px 14px",borderRadius:10,border:`1px solid ${anCharts[k]?"var(--accent)":"var(--border)"}`,background:anCharts[k]?"var(--accent-bg)":"#fff",color:anCharts[k]?"var(--accent)":"var(--text3)",fontSize:12,fontWeight:600,cursor:"pointer"}}>{anCharts[k]?"✓ ":"○ "}{nm}</button>)}
 </div></div>}
+
+{/* KPI row */}
+{anCharts.kpis&&<div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12,marginBottom:20}}>
+<div className="kpi"><div className="kpi-glow" style={{background:"var(--accent)"}}/><div className="kpi-l">Всего</div><div className="kpi-v" style={{color:"var(--accent)"}}>{anStats.total}</div><div className="kpi-s">в выборке</div></div>
+<div className="kpi"><div className="kpi-glow" style={{background:"var(--green)"}}/><div className="kpi-l">Выполнено</div><div className="kpi-v" style={{color:"var(--green)"}}>{anPct}%</div><div className="kpi-s">{anStats.done} задач</div></div>
+<div className="kpi"><div className="kpi-glow" style={{background:"var(--amber)"}}/><div className="kpi-l">Ср. прогресс</div><div className="kpi-v" style={{color:"var(--amber)"}}>{anAvgProg}%</div><div className="kpi-s">по всем</div></div>
+<div className="kpi"><div className="kpi-glow" style={{background:"var(--red)"}}/><div className="kpi-l">Просрочено</div><div className="kpi-v" style={{color:"var(--red)"}}>{anStats.over}</div><div className="kpi-s">срок вышел</div></div>
+<div className="kpi"><div className="kpi-glow" style={{background:"var(--cyan)"}}/><div className="kpi-l">Пунктуальность</div><div className="kpi-v" style={{color:"var(--cyan2)"}}>{onTimeRate!==null?onTimeRate+"%":"—"}</div><div className="kpi-s">в срок</div></div>
+<div className="kpi"><div className="kpi-glow" style={{background:"#EC4899"}}/><div className="kpi-l">Ср. срок</div><div className="kpi-v" style={{color:"#DB2777"}}>{avgCompTime!==null?avgCompTime:"—"}</div><div className="kpi-s">дней на задачу</div></div>
+</div>}
+
+<div className="analytics-grid">
+{anCharts.status&&<div className="chart-card">
+<div className="chart-header"><span className="chart-title">📊 Статусы задач</span></div>
+{statusSegs.length?<div className="donut-container"><DonutChart segments={statusSegs} size={150} thickness={26}/>
+<div className="donut-legend">{statusSegs.map(s=><div key={s.label} className="donut-legend-item"><div className="donut-legend-dot" style={{background:s.color}}/><span>{s.label}</span><span style={{fontFamily:"var(--mono)",fontWeight:700,marginLeft:"auto",paddingLeft:12}}>{s.value} ({Math.round(s.pct)}%)</span></div>)}</div>
+</div>:<div style={{textAlign:"center",padding:30,color:"var(--text4)"}}>Нет данных</div>}
+</div>}
+
+{anCharts.category&&<div className="chart-card">
+<div className="chart-header"><span className="chart-title">🏷️ По категориям</span></div>
+{(()=>{const cd={};anFiltered.forEach(t=>{cd[t.cat]=(cd[t.cat]||0)+1});const entries=Object.entries(cd).sort((a,b)=>b[1]-a[1]);const mx=Math.max(...entries.map(e=>e[1]),1);
+return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key={c} className="bar-col"><div className="bar-value">{n}</div><div className="bar-fill" style={{height:`${(n/mx)*100}%`,background:gc(c),minHeight:4}}/><div className="bar-label">{c}</div></div>)}</div>:<div style={{textAlign:"center",padding:30,color:"var(--text4)"}}>Нет данных</div>})()}
+</div>}
+
+{anCharts.priority&&<div className="chart-card">
+<div className="chart-header"><span className="chart-title">🎯 По приоритетам</span></div>
+{data.priorities.map(p=>{const c=anFiltered.filter(t=>t.pri===p).length;const tot=anFiltered.length||1;return<div key={p} style={{marginBottom:12}}>
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:600,color:gp(p)}}>{p}</span><span style={{fontSize:12,fontWeight:700,fontFamily:"var(--mono)"}}>{c} ({Math.round(c/tot*100)}%)</span></div>
+<div style={{width:"100%",height:10,background:"var(--bg4)",borderRadius:6,overflow:"hidden"}}><div style={{width:`${(c/tot)*100}%`,height:"100%",background:gp(p),borderRadius:6,transition:"width .5s"}}/></div>
+</div>})}
+</div>}
+
+{anCharts.productivity&&<div className="chart-card">
+<div className="chart-header"><span className="chart-title">⚡ Продуктивность</span></div>
+<div className="stat-row"><span style={{color:"var(--text2)"}}>Всего задач</span><span style={{fontWeight:700,fontFamily:"var(--mono)"}}>{anStats.total}</span></div>
+<div className="stat-row"><span style={{color:"var(--text2)"}}>Завершено</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--green)"}}>{anStats.done}</span></div>
+<div className="stat-row"><span style={{color:"var(--text2)"}}>В работе</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--accent)"}}>{anStats.active}</span></div>
+<div className="stat-row"><span style={{color:"var(--text2)"}}>Горящих</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--amber)"}}>{anStats.burn}</span></div>
+<div className="stat-row"><span style={{color:"var(--text2)"}}>Просрочено</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--red)"}}>{anStats.over}</span></div>
+<div className="stat-row"><span style={{color:"var(--text2)"}}>Коэф. завершения</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:anPct>=70?"var(--green)":anPct>=40?"var(--amber)":"var(--red)"}}>{anPct}%</span></div>
+</div>}
+
+{anCharts.timeline&&<div className="chart-card" style={{gridColumn:"1/-1"}}>
+<div className="chart-header"><span className="chart-title">📅 Активность (14 дней): создано vs завершено</span></div>
+<div className="bar-chart" style={{height:140}}>
+{timeline.map(d=><div key={d.day} className="bar-col">
+<div className="bar-value" style={{fontSize:9}}>{d.created||d.completed?`+${d.created}/✓${d.completed}`:""}</div>
+<div style={{display:"flex",gap:2,alignItems:"flex-end",width:"100%",height:"100%"}}>
+<div style={{flex:1,height:`${(d.created/maxTL)*100}%`,background:"var(--accent)",borderRadius:"4px 4px 0 0",minHeight:d.created?4:0}}/>
+<div style={{flex:1,height:`${(d.completed/maxTL)*100}%`,background:"var(--green)",borderRadius:"4px 4px 0 0",minHeight:d.completed?4:0}}/>
+</div>
+<div className="bar-label" style={{fontSize:8}}>{fmtS(d.day)}</div>
+</div>)}
+</div>
+<div style={{display:"flex",gap:16,justifyContent:"center",marginTop:10}}>
+<div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"var(--text3)"}}><div style={{width:10,height:10,borderRadius:3,background:"var(--accent)"}}/> Создано</div>
+<div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"var(--text3)"}}><div style={{width:10,height:10,borderRadius:3,background:"var(--green)"}}/> Завершено</div>
+</div></div>}
+
+{anCharts.heatmap&&<div className="chart-card" style={{gridColumn:"1/-1"}}>
+<div className="chart-header"><span className="chart-title">🔥 Тепловая карта завершений (12 недель)</span></div>
+<div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+<div style={{display:"flex",flexDirection:"column",gap:3,paddingTop:2}}>
+{dayN.map(d=><div key={d} style={{height:18,fontSize:9,color:"var(--text4)",display:"flex",alignItems:"center"}}>{d}</div>)}
+</div>
+<div style={{display:"grid",gridTemplateColumns:`repeat(${heatmap.length},1fr)`,gap:3,flex:1}}>
+{heatmap.map((week,wi)=><div key={wi} style={{display:"flex",flexDirection:"column",gap:3}}>
+{week.map((cell,di)=>{const intensity=cell.count/maxHeat;return<div key={di} className="heatmap-cell" title={`${fmt(cell.date)}: ${cell.count} завершений`} style={{height:18,background:cell.count===0?"var(--bg4)":`rgba(16,185,129,${Math.max(.15,intensity)})`,borderRadius:3}}/>})}
+</div>)}
+</div></div>
+<div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"flex-end",marginTop:8}}>
+<span style={{fontSize:9,color:"var(--text4)"}}>Меньше</span>
+{[0,.25,.5,.8].map((o,i)=><div key={i} style={{width:14,height:14,borderRadius:3,background:o===0?"var(--bg4)":`rgba(16,185,129,${o})`}}/>)}
+<span style={{fontSize:9,color:"var(--text4)"}}>Больше</span>
+</div></div>}
+
+{anCharts.catPri&&<div className="chart-card">
+<div className="chart-header"><span className="chart-title">🔀 Матрица Категория × Приоритет</span></div>
+<div style={{overflowX:"auto"}}>
+<table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+<thead><tr><th style={{textAlign:"left",padding:"8px",color:"var(--text3)",fontWeight:600,fontSize:10,textTransform:"uppercase"}}></th>
+{data.priorities.map(p=><th key={p} style={{padding:"8px",textAlign:"center",color:gp(p),fontWeight:600,fontSize:10}}>{p}</th>)}
+</tr></thead>
+<tbody>{data.categories.map(c=><tr key={c}>
+<td style={{padding:"8px",fontWeight:600,color:gc(c),fontSize:12}}>{c}</td>
+{data.priorities.map(p=>{const v=catPri[c]?.[p]||0;return<td key={p} style={{textAlign:"center",padding:"8px"}}>
+<span style={{display:"inline-flex",width:32,height:32,borderRadius:8,alignItems:"center",justifyContent:"center",fontWeight:700,fontFamily:"var(--mono)",fontSize:13,background:v?gc(c)+"20":"var(--bg4)",color:v?gc(c):"var(--text4)"}}>{v}</span>
+</td>})}
+</tr>)}</tbody></table>
+</div></div>}
+
+{anCharts.avgProg&&<div className="chart-card">
+<div className="chart-header"><span className="chart-title">📊 Средний прогресс по категориям</span></div>
+{data.categories.map(c=>{const v=apc[c];if(!anFiltered.some(t=>t.cat===c))return null;return<div key={c} style={{marginBottom:12}}>
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:600,color:gc(c)}}>{c}</span><span style={{fontSize:12,fontWeight:700,fontFamily:"var(--mono)"}}>{v}%</span></div>
+<div style={{width:"100%",height:10,background:"var(--bg4)",borderRadius:6,overflow:"hidden"}}><div style={{width:`${v}%`,height:"100%",background:gc(c),borderRadius:6,transition:"width .5s"}}/></div>
+</div>})}
+</div>}
+
+{anCharts.completion&&<div className="chart-card">
+<div className="chart-header"><span className="chart-title">⏱ Скорость выполнения</span></div>
+<div style={{textAlign:"center",padding:"20px 0"}}>
+<div style={{fontSize:48,fontWeight:800,fontFamily:"var(--mono)",color:avgCompTime!==null?(avgCompTime<=3?"var(--green)":avgCompTime<=7?"var(--amber)":"var(--red)"):"var(--text4)"}}>{avgCompTime!==null?avgCompTime:"—"}</div>
+<div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>дней в среднем на задачу</div>
+<div style={{marginTop:20,padding:12,background:"var(--bg)",borderRadius:10,fontSize:12,color:"var(--text2)",lineHeight:1.6}}>
+{avgCompTime===null?"Нет завершённых задач со стартом для расчёта":
+avgCompTime<=3?"🚀 Отличная скорость работы!":
+avgCompTime<=7?"👍 Нормальный темп работы":
+"⚠️ Задачи выполняются медленно"}
+</div></div></div>}
+
+{anCharts.onTime&&<div className="chart-card">
+<div className="chart-header"><span className="chart-title">🎯 Пунктуальность</span></div>
+<div style={{textAlign:"center",padding:"20px 0"}}>
+<div style={{fontSize:48,fontWeight:800,fontFamily:"var(--mono)",color:onTimeRate!==null?(onTimeRate>=80?"var(--green)":onTimeRate>=50?"var(--amber)":"var(--red)"):"var(--text4)"}}>{onTimeRate!==null?onTimeRate+"%":"—"}</div>
+<div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>задач завершено в срок</div>
+<div style={{marginTop:20,padding:12,background:"var(--bg)",borderRadius:10,fontSize:12,color:"var(--text2)",lineHeight:1.6}}>
+{onTimeRate===null?"Нет данных о завершениях":
+onTimeRate>=80?"🏆 Превосходная дисциплина!":
+onTimeRate>=50?"👌 Есть куда расти":
+"📉 Часто срываются сроки"}
+</div></div></div>}
+
+{anCharts.upcoming&&<div className="chart-card" style={{gridColumn:"1/-1"}}>
+<div className="chart-header"><span className="chart-title">⏰ Ближайшие дедлайны (7 дней)</span></div>
+{upcoming.length?<div style={{display:"flex",flexDirection:"column",gap:6}}>
+{upcoming.map(t=>{const st=getS(t,now);const dl=diffD(t.deadline,now);return<div key={t.id} className="tr" onClick={()=>setDetailTask(t)} style={{cursor:"pointer"}}>
+<div className="task-left" style={{background:gp(t.pri)}}/>
+<div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:14}}>{t.name}</div>
+<div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap",alignItems:"center"}}><Bdg color={gc(t.cat)}>{t.cat}</Bdg><Bdg color={gp(t.pri)} bg={gb(t.pri)}>{t.pri}</Bdg><span style={{fontSize:11,color:dl===0?"var(--red)":dl<=2?"var(--amber)":"var(--text3)"}}>📅 {fmt(t.deadline)} · {dl===0?"сегодня":`через ${dl} д.`}</span></div></div>
+<div style={{textAlign:"right",flexShrink:0}}><Bdg color={st.c}>{st.i} {st.l}</Bdg><div style={{fontSize:13,fontWeight:700,color:st.c,fontFamily:"var(--mono)",marginTop:3}}>{t.progress}%</div></div>
+</div>})}
+</div>:<div style={{textAlign:"center",padding:30,color:"var(--text4)"}}>🎉 Нет срочных дедлайнов на неделю</div>}
+</div>}
+
+</div></div>})()}
 
 {/* ЭКСПОРТ */}
 {tab==="Экспорт"&&<div><div style={{fontSize:20,fontWeight:800,marginBottom:6}}>📄 Экспорт отчёта</div><div style={{color:"var(--text3)",fontSize:13,marginBottom:20}}>Сформируйте отчёт для руководителя</div>
@@ -590,6 +1001,7 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 {detailTask&&<TDetail task={data.tasks.find(x=>x.id===detailTask.id)||detailTask} onClose={()=>setDetailTask(null)} now={now} onEdit={t=>{setDetailTask(null);setEditTask(t);setShowForm(true)}} onDelete={delT} onProg={setProg}/>}
 {showSettings&&<Settings data={data} onUpdate={reload} onClose={()=>setShowSettings(false)} showToast={showToast} protectedCats={data.protectedCats}/>}
 {toast&&<Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)}/>}
+{drillKpi&&<KpiDrill kpi={drillKpi} tasks={data.tasks} now={now} onClose={()=>setDrillKpi(null)} onOpenTask={t=>setDetailTask(t)}/>}
 </div>}
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);

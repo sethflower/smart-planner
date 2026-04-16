@@ -136,6 +136,7 @@ def get_all_data():
             "timeStart": t["time_start"] or "",
             "timeEnd": t["time_end"] or "",
             "completedAt": t["completed_at"],
+            "createdAt": t["created_at"],
         })
     protected = [r["name"] for r in conn.execute("SELECT name FROM categories WHERE protected=1").fetchall()]
     conn.close()
