@@ -53,17 +53,41 @@ def init_db():
             time_start TEXT DEFAULT '',
             time_end TEXT DEFAULT '',
             completed_at TEXT,
+            type TEXT DEFAULT 'task',
             created_at TEXT DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (category) REFERENCES categories(name),
             FOREIGN KEY (priority) REFERENCES priorities(name)
         )
     """)
 
+    # Migration: add `type` column to existing databases if missing
+    cols = [r["name"] for r in c.execute("PRAGMA table_info(tasks)").fetchall()]
+    if "type" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN type TEXT DEFAULT 'task'")
+        # Mark existing tasks in 'Совещание' category as meetings
+        c.execute("UPDATE tasks SET type='meeting' WHERE category='Совещание'")
+        conn.commit()
+
+    # Migration: meetings shouldn't belong to "Совещание" category anymore.
+    # Reassign their category to first available category so they don't need that legacy category.
+    meeting_count = c.execute("SELECT COUNT(*) FROM tasks WHERE type='meeting' AND category='Совещание'").fetchone()[0]
+    if meeting_count > 0:
+        first_cat_row = c.execute("SELECT name FROM categories WHERE name!='Совещание' ORDER BY id LIMIT 1").fetchone()
+        if first_cat_row:
+            c.execute("UPDATE tasks SET category=? WHERE type='meeting' AND category='Совещание'", (first_cat_row["name"],))
+        conn.commit()
+
+    # Now safe to remove legacy "Совещание" category if no regular tasks use it
+    legacy_task_count = c.execute("SELECT COUNT(*) FROM tasks WHERE category='Совещание' AND type='task'").fetchone()[0]
+    if legacy_task_count == 0:
+        c.execute("DELETE FROM categories WHERE name='Совещание'")
+        conn.commit()
+
     # Seed defaults if empty
     cats = c.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
     if cats == 0:
         defaults = [
-            ("Рабочая", 0), ("Совещание", 1), ("Проект", 0),
+            ("Рабочая", 0), ("Проект", 0),
             ("Обучение", 0), ("Личная", 0), ("Рутина", 0),
         ]
         c.executemany("INSERT INTO categories (name, protected) VALUES (?, ?)", defaults)
@@ -76,30 +100,31 @@ def init_db():
     tasks_count = c.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
     if tasks_count == 0:
         today = datetime.now().strftime("%Y-%m-%d")
+        # (id, name, category, priority, description, start, deadline, progress, notes, time_start, time_end, completed_at, type)
         seed = [
             (uid(), "Подготовить отчёт Q1", "Рабочая", "Высокий",
              "Сводный отчёт за квартал с графиками", today, off(3), 35,
-             "Нужны данные от финансов", "", "", None),
-            (uid(), "Совещание по проекту Alpha", "Совещание", "Средний",
+             "Нужны данные от финансов", "", "", None, "task"),
+            (uid(), "Совещание по проекту Alpha", "Рабочая", "Средний",
              "Еженедельный статус-митинг", today, today, 0,
-             "Презентация на 5 слайдов", "10:00", "11:30", None),
+             "Презентация на 5 слайдов", "10:00", "11:30", None, "meeting"),
             (uid(), "Обновить тарифы на сайте", "Проект", "Высокий",
              "Актуализация цен", off(-5), off(-1), 45,
-             "Согласовать с маркетингом", "", "", None),
+             "Согласовать с маркетингом", "", "", None, "task"),
             (uid(), "Курс по аналитике", "Обучение", "Низкий",
-             "Модуль 3 из 8", off(-10), off(15), 30, "", "", "", None),
+             "Модуль 3 из 8", off(-10), off(15), 30, "", "", "", None, "task"),
             (uid(), "Оптимизация маршрутов", "Проект", "Высокий",
              "Зоны доставки 2 и 3", off(-7), off(7), 40,
-             "Приоритет — зона 3", "", "", None),
-            (uid(), "Планёрка отдела логистики", "Совещание", "Высокий",
-             "Обсуждение KPI", off(1), off(1), 0, "", "09:00", "09:45", None),
-            (uid(), "Ревью дизайна", "Совещание", "Средний",
-             "Обзор макетов", off(2), off(2), 0, "", "14:00", "15:00", None),
+             "Приоритет — зона 3", "", "", None, "task"),
+            (uid(), "Планёрка отдела логистики", "Рабочая", "Высокий",
+             "Обсуждение KPI", off(1), off(1), 0, "", "09:00", "09:45", None, "meeting"),
+            (uid(), "Ревью дизайна", "Проект", "Средний",
+             "Обзор макетов", off(2), off(2), 0, "", "14:00", "15:00", None, "meeting"),
         ]
         c.executemany("""
             INSERT INTO tasks (id, name, category, priority, description,
-                start_date, deadline, progress, notes, time_start, time_end, completed_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                start_date, deadline, progress, notes, time_start, time_end, completed_at, type)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, seed)
 
     conn.commit()
@@ -137,6 +162,7 @@ def get_all_data():
             "timeEnd": t["time_end"] or "",
             "completedAt": t["completed_at"],
             "createdAt": t["created_at"],
+            "type": t["type"] if "type" in t.keys() else "task",
         })
     protected = [r["name"] for r in conn.execute("SELECT name FROM categories WHERE protected=1").fetchall()]
     conn.close()
@@ -153,14 +179,15 @@ def add_task(data):
     tid = uid()
     conn.execute("""
         INSERT INTO tasks (id, name, description, category, priority,
-            start_date, deadline, progress, notes, time_start, time_end, completed_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            start_date, deadline, progress, notes, time_start, time_end, completed_at, type)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         tid, data["name"], data.get("desc", ""), data["cat"], data["pri"],
         data.get("start", ""), data.get("deadline", ""),
         int(data.get("progress", 0)), data.get("notes", ""),
         data.get("timeStart", ""), data.get("timeEnd", ""),
         data.get("completedAt"),
+        data.get("type", "task"),
     ))
     conn.commit()
     conn.close()
@@ -176,7 +203,7 @@ def update_task(task_id, data):
         "pri": "priority", "start": "start_date", "deadline": "deadline",
         "progress": "progress", "notes": "notes",
         "timeStart": "time_start", "timeEnd": "time_end",
-        "completedAt": "completed_at",
+        "completedAt": "completed_at", "type": "type",
     }
     for js_key, db_col in mapping.items():
         if js_key in data:
