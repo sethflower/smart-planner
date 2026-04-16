@@ -54,6 +54,9 @@ def init_db():
             time_end TEXT DEFAULT '',
             completed_at TEXT,
             type TEXT DEFAULT 'task',
+            meeting_result TEXT DEFAULT '',
+            reminder_sent_at TEXT,
+            overdue_notified_at TEXT,
             created_at TEXT DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (category) REFERENCES categories(name),
             FOREIGN KEY (priority) REFERENCES priorities(name)
@@ -66,6 +69,16 @@ def init_db():
         c.execute("ALTER TABLE tasks ADD COLUMN type TEXT DEFAULT 'task'")
         # Mark existing tasks in 'Совещание' category as meetings
         c.execute("UPDATE tasks SET type='meeting' WHERE category='Совещание'")
+        conn.commit()
+
+    if "meeting_result" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN meeting_result TEXT DEFAULT ''")
+        conn.commit()
+    if "reminder_sent_at" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN reminder_sent_at TEXT")
+        conn.commit()
+    if "overdue_notified_at" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN overdue_notified_at TEXT")
         conn.commit()
 
     # Migration: meetings shouldn't belong to "Совещание" category anymore.
@@ -161,6 +174,9 @@ def get_all_data():
             "timeStart": t["time_start"] or "",
             "timeEnd": t["time_end"] or "",
             "completedAt": t["completed_at"],
+            "meetingResult": t["meeting_result"] if "meeting_result" in t.keys() else "",
+            "reminderSentAt": t["reminder_sent_at"] if "reminder_sent_at" in t.keys() else None,
+            "overdueNotifiedAt": t["overdue_notified_at"] if "overdue_notified_at" in t.keys() else None,
             "createdAt": t["created_at"],
             "type": t["type"] if "type" in t.keys() else "task",
         })
@@ -177,17 +193,31 @@ def get_all_data():
 def add_task(data):
     conn = get_conn()
     tid = uid()
+    category = data.get("cat", "")
+    priority = data.get("pri", "")
+    if data.get("type") == "meeting" and category == "Совещание":
+        fallback_cat = conn.execute("SELECT name FROM categories ORDER BY id LIMIT 1").fetchone()
+        category = fallback_cat["name"] if fallback_cat else "Рабочая"
+    if not category:
+        fallback_cat = conn.execute("SELECT name FROM categories ORDER BY id LIMIT 1").fetchone()
+        category = fallback_cat["name"] if fallback_cat else "Рабочая"
+    if not priority:
+        fallback_pri = conn.execute("SELECT name FROM priorities ORDER BY sort_order LIMIT 1").fetchone()
+        priority = fallback_pri["name"] if fallback_pri else "Средний"
     conn.execute("""
         INSERT INTO tasks (id, name, description, category, priority,
-            start_date, deadline, progress, notes, time_start, time_end, completed_at, type)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            start_date, deadline, progress, notes, time_start, time_end, completed_at, type, meeting_result, reminder_sent_at, overdue_notified_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
-        tid, data["name"], data.get("desc", ""), data["cat"], data["pri"],
+        tid, data["name"], data.get("desc", ""), category, priority,
         data.get("start", ""), data.get("deadline", ""),
         int(data.get("progress", 0)), data.get("notes", ""),
         data.get("timeStart", ""), data.get("timeEnd", ""),
         data.get("completedAt"),
         data.get("type", "task"),
+        data.get("meetingResult", ""),
+        data.get("reminderSentAt"),
+        data.get("overdueNotifiedAt"),
     ))
     conn.commit()
     conn.close()
@@ -204,6 +234,9 @@ def update_task(task_id, data):
         "progress": "progress", "notes": "notes",
         "timeStart": "time_start", "timeEnd": "time_end",
         "completedAt": "completed_at", "type": "type",
+        "meetingResult": "meeting_result",
+        "reminderSentAt": "reminder_sent_at",
+        "overdueNotifiedAt": "overdue_notified_at",
     }
     for js_key, db_col in mapping.items():
         if js_key in data:
@@ -300,14 +333,18 @@ def import_data(json_str):
         try:
             conn.execute("""
                 INSERT OR REPLACE INTO tasks (id,name,description,category,priority,
-                    start_date,deadline,progress,notes,time_start,time_end,completed_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    start_date,deadline,progress,notes,time_start,time_end,completed_at,type,meeting_result,reminder_sent_at,overdue_notified_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 t.get("id", uid()), t["name"], t.get("desc", ""),
                 t["cat"], t["pri"], t.get("start", ""), t.get("deadline", ""),
                 int(t.get("progress", 0)), t.get("notes", ""),
                 t.get("timeStart", ""), t.get("timeEnd", ""),
                 t.get("completedAt"),
+                t.get("type", "task"),
+                t.get("meetingResult", ""),
+                t.get("reminderSentAt"),
+                t.get("overdueNotifiedAt"),
             ))
         except Exception:
             pass
