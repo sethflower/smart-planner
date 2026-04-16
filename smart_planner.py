@@ -2,9 +2,14 @@
 Smart Planner Pro — Windows Desktop Application
 Requires: pip install pywebview
 """
-import webview
-import database as db
-from api import Api
+import os
+import json
+import sqlite3
+import datetime
+import http.server
+
+PORT = 5000
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smart_planner.db")
 
 
 def get_html():
