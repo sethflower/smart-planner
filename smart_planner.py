@@ -179,8 +179,8 @@ const fmt=d=>{if(!d)return"\u2014";const t=new Date(d);return`${String(t.getDate
 const fmtS=d=>{if(!d)return"";const t=new Date(d);return`${String(t.getDate()).padStart(2,"0")}.${String(t.getMonth()+1).padStart(2,"0")}`};
 const diffD=(a,b)=>Math.round((new Date(a)-new Date(b))/864e5);
 /* Tabs split: separate Meetings tab, remove "Расписание" (integrated into Meetings) */
-const TABS=["Панель","Задачи","Совещания","Сегодня","Журнал","Аналитика","Экспорт"];
-const TAB_ICONS={"Панель":"\ud83d\udcca","Задачи":"\ud83d\udccb","Совещания":"\ud83d\udd52","Сегодня":"\u2600\ufe0f","Журнал":"\ud83d\udcd3","Аналитика":"\ud83d\udcc8","Экспорт":"\ud83d\udcc4"};
+const TABS=["Панель","Задачи","Совещания","Циклы","Сегодня","Журнал","Аналитика","Экспорт"];
+const TAB_ICONS={"Панель":"\ud83d\udcca","Задачи":"\ud83d\udccb","Совещания":"\ud83d\udd52","Циклы":"\ud83d\udd01","Сегодня":"\u2600\ufe0f","Журнал":"\ud83d\udcd3","Аналитика":"\ud83d\udcc8","Экспорт":"\ud83d\udcc4"};
 const dayN=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 const hours=Array.from({length:15},(_,i)=>`${String(i+7).padStart(2,"0")}:00`);
 const monthN=["","Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
@@ -260,10 +260,10 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 </div></div></div></div>}
 
 /* ─── Meeting Form ─── */
-function MForm({onClose,initial,onSubmit,pris}){
-const[f,setF]=useState(initial?{...initial}:{name:"",pri:pris[1]||pris[0]||"",desc:"",start:td(),deadline:td(),timeStart:"",timeEnd:"",progress:0,notes:""});
+function MForm({onClose,initial,onSubmit,pris,cats}){
+const[f,setF]=useState(initial?{...initial}:{name:"",cat:cats[0]||"",pri:pris[1]||pris[0]||"",desc:"",start:td(),deadline:td(),timeStart:"",timeEnd:"",progress:0,notes:"",result:""});
 const s=(k,v)=>setF(p=>({...p,[k]:v}));
-const go=()=>{if(!f.name.trim())return;onSubmit({...f,progress:parseInt(f.progress)||0,type:"meeting",cat:"Совещание"});onClose()};
+const go=()=>{if(!f.name.trim())return;onSubmit({...f,progress:parseInt(f.progress)||0,type:"meeting",cat:f.cat||cats[0]||"Рабочая"});onClose()};
 return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.stopPropagation()}>
 <div className="mh" style={{background:"linear-gradient(135deg,rgba(6,182,212,.08),rgba(6,182,212,.02))"}}><h3>🕐 {initial?"Редактировать совещание":"Новое совещание"}</h3><button className="mc" onClick={onClose}>×</button></div>
 <div className="mb"><div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -277,8 +277,12 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 <div className="fl"><label style={{color:"var(--cyan2)"}}>🕐 Время начала</label><input type="time" value={f.timeStart||""} onChange={e=>s("timeStart",e.target.value)}/></div>
 <div className="fl"><label style={{color:"var(--cyan2)"}}>🕐 Время окончания</label><input type="time" value={f.timeEnd||""} onChange={e=>s("timeEnd",e.target.value)}/></div>
 </div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+<div className="fl"><label>Категория</label><select value={f.cat} onChange={e=>s("cat",e.target.value)}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
 <div className="fl"><label>Приоритет</label><select value={f.pri} onChange={e=>s("pri",e.target.value)}>{pris.map(p=><option key={p}>{p}</option>)}</select></div>
+</div>
 <div className="fl"><label>Заметки</label><textarea value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Заметки по совещанию..."/></div>
+<div className="fl"><label>Результаты совещания</label><textarea value={f.result||""} onChange={e=>s("result",e.target.value)} placeholder="Итоги, решения, действия..."/></div>
 <button className="bp bp-cyan" onClick={go} style={{marginTop:6}}>{initial?"💾 Сохранить":"➕ Добавить совещание"}</button>
 </div></div></div></div>}
 
@@ -322,6 +326,7 @@ return<><div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex
 <PBar value={task.progress} color={st.c} onChange={p=>onProg(task.id,p)} size={14}/>
 </div>
 {task.notes&&<div style={{marginBottom:18}}><div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>Заметки</div><div style={{background:"var(--bg)",borderRadius:12,padding:14,fontSize:14,color:"var(--text2)",lineHeight:1.6,border:"1px solid var(--border)"}}>{task.notes}</div></div>}
+{isM&&task.result&&<div style={{marginBottom:18}}><div style={{fontSize:10,fontWeight:700,color:"var(--cyan2)",textTransform:"uppercase",marginBottom:6}}>Результаты совещания</div><div style={{background:"var(--cyan-bg)",borderRadius:12,padding:14,fontSize:14,color:"var(--text2)",lineHeight:1.6,border:"1px solid rgba(6,182,212,.2)"}}>{task.result}</div></div>}
 </div>
 <div style={{padding:"16px 24px",borderTop:"1px solid var(--border)",display:"flex",gap:10,justifyContent:"flex-end"}}>
 <button className="bd" onClick={()=>setCd(true)}>🗑 Удалить</button>
@@ -363,6 +368,30 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 <button className="bo" onClick={doAddPri}>+</button>
 </div></div>
 </div></div></div>}
+
+function RecurrenceForm({onClose,onSubmit,initial,cats,pris}){
+const base=initial||{itemType:"task",name:"",desc:"",cat:cats[0]||"",pri:pris[1]||pris[0]||"",notes:"",timeStart:"09:00",timeEnd:"10:00",startDate:td(),endDate:"",everyDay:false,weekdays:[],deadlineOffsetDays:1};
+const[f,setF]=useState(base);
+const s=(k,v)=>setF(p=>({...p,[k]:v}));
+const toggleW=d=>setF(p=>({...p,weekdays:p.weekdays.includes(d)?p.weekdays.filter(x=>x!==d):[...p.weekdays,d]}));
+const go=()=>{if(!f.name.trim())return;if(!f.everyDay&&!f.weekdays.length)return;onSubmit({...f});onClose()};
+return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.stopPropagation()}>
+<div className="mh"><h3>🔁 {initial?"Редактировать цикл":"Новое циклическое действие"}</h3><button className="mc" onClick={onClose}>×</button></div>
+<div className="mb"><div style={{display:"flex",flexDirection:"column",gap:12}}>
+<div className="fl"><label>Тип</label><select value={f.itemType} onChange={e=>s("itemType",e.target.value)}><option value="task">Задача</option><option value="meeting">Совещание</option></select></div>
+<div className="fl"><label>Название *</label><input value={f.name} onChange={e=>s("name",e.target.value)}/></div>
+<div className="fl"><label>Описание</label><textarea value={f.desc} onChange={e=>s("desc",e.target.value)}/></div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+<div className="fl"><label>Категория</label><select value={f.cat} onChange={e=>s("cat",e.target.value)}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
+<div className="fl"><label>Приоритет</label><select value={f.pri} onChange={e=>s("pri",e.target.value)}>{pris.map(p=><option key={p}>{p}</option>)}</select></div>
+</div>
+{f.itemType==="meeting"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><div className="fl"><label>Время начала</label><input type="time" value={f.timeStart} onChange={e=>s("timeStart",e.target.value)}/></div><div className="fl"><label>Время окончания</label><input type="time" value={f.timeEnd} onChange={e=>s("timeEnd",e.target.value)}/></div></div>}
+{f.itemType==="task"&&<div className="fl"><label>Дедлайн через дней</label><input type="number" min="0" value={f.deadlineOffsetDays} onChange={e=>s("deadlineOffsetDays",parseInt(e.target.value||0))}/></div>}
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><div className="fl"><label>Начало цикла</label><input type="date" value={f.startDate} onChange={e=>s("startDate",e.target.value)}/></div><div className="fl"><label>До даты (опц.)</label><input type="date" value={f.endDate||""} onChange={e=>s("endDate",e.target.value)}/></div></div>
+<div><label style={{fontSize:11,fontWeight:700,color:"var(--text3)"}}>Повторение</label><div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}><button className="bo" style={{background:f.everyDay?"var(--accent-bg)":"#fff"}} onClick={()=>s("everyDay",!f.everyDay)}>Ежедневно</button>{dayN.map((d,i)=><button key={i} className="bo" style={{background:f.weekdays.includes(i)?"var(--accent-bg)":"#fff"}} onClick={()=>toggleW(i)}>{d}</button>)}</div></div>
+<button className="bp" onClick={go}>💾 Сохранить цикл</button>
+</div></div></div></div>
+}
 
 /* ─── KPI Drill-down ─── */
 function KpiDrill({kpi,tasks,now,onClose,onOpenTask}){
@@ -429,6 +458,8 @@ const[habMonth,setHabMonth]=useState(()=>{const d=new Date();return`${d.getFullY
 const[toast,setToast]=useState(null);
 const showToast=(msg,type)=>setToast({msg,type});
 const[drillKpi,setDrillKpi]=useState(null);
+const[showRecForm,setShowRecForm]=useState(false);
+const[editRec,setEditRec]=useState(null);
 /* Period filters per tab */
 const[panelPeriod,setPanelPeriod]=useState("all");
 const[anPeriod,setAnPeriod]=useState("all");
@@ -437,10 +468,26 @@ const[anPri,setAnPri]=useState("");
 
 const reload=useCallback(async()=>{const raw=await callApi("get_data");setData(JSON.parse(raw));setLoading(false)},[]);
 useEffect(()=>{reload()},[reload]);
+useEffect(()=>{
+const timer=setInterval(async()=>{
+  const nowDt=new Date();
+  const stamp=`${nowDt.getFullYear()}-${String(nowDt.getMonth()+1).padStart(2,"0")}-${String(nowDt.getDate()).padStart(2,"0")}T${String(nowDt.getHours()).padStart(2,"0")}:${String(nowDt.getMinutes()).padStart(2,"0")}`;
+  const raw=await callApi("get_notifications",stamp);
+  const list=JSON.parse(raw||"[]");
+  if(list.length){
+    showToast(`${list[0].title}: ${list[0].text}`);
+    reload();
+  }
+},60000);
+return()=>clearInterval(timer);
+},[reload]);
 
 const addT=async t=>{await callApi("add_task",JSON.stringify(t));reload()};
 const updT=async(id,patch)=>{await callApi("update_task",id,JSON.stringify(patch));reload()};
 const delT=async id=>{await callApi("delete_task",id);setDetailTask(null);reload()};
+const addRec=async r=>{await callApi("add_recurrence_rule",JSON.stringify(r));reload()};
+const updRec=async(id,r)=>{await callApi("update_recurrence_rule",id,JSON.stringify(r));reload()};
+const delRec=async id=>{await callApi("delete_recurrence_rule",id);reload()};
 const setProg=async(id,p)=>{const patch=p>=100?{progress:p,completedAt:td()}:{progress:p,completedAt:null};await callApi("update_task",id,JSON.stringify(patch));if(detailTask&&detailTask.id===id)setDetailTask(prev=>({...prev,...patch}));reload()};
 
 /* Split tasks into regular and meetings */
@@ -519,6 +566,13 @@ if(expPris.length&&!expPris.includes(t.pri))return false;
 if(expStat.length&&!expStat.includes(getS(t,now).l))return false;
 return true
 }),[tasksOnly,expFrom,expTo,expCats,expPris,expStat,now]);
+const expMeetings=useMemo(()=>meetings.filter(m=>{
+if(!m.name)return false;
+const d=m.start||m.deadline;
+if(!d)return false;
+if(d<expFrom||d>expTo)return false;
+return true;
+}),[meetings,expFrom,expTo]);
 
 const expStats=useMemo(()=>{const s={total:expFiltered.length,done:0,active:0,overdue:0,burning:0};expFiltered.forEach(t=>{const st=getS(t,now);if(st.l==="Выполнено")s.done++;else if(st.l==="Просрочено")s.overdue++;else if(st.l==="Горит")s.burning++;else s.active++});s.pct=s.total?Math.round(s.done/s.total*100):0;s.avgProg=s.total?Math.round(expFiltered.reduce((a,t)=>a+(t.progress||0),0)/s.total):0;return s},[expFiltered,now]);
 
@@ -668,6 +722,11 @@ ${inprog.length?`<div class="section"><h2 style="color:#4361EE">⟳ Задачи
 ${done.length?`<div class="section page-break"><h2 style="color:#10B981">✓ Выполненные задачи <span class="count">${done.length}</span></h2>
 <table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Статус</th><th>Прогресс</th><th>Завершено</th></tr></thead><tbody>${done.map(t=>taskRow(t,false)).join('')}</tbody></table></div>`:''}
 
+${expMeetings.length?`<div class="section page-break"><h2 style="color:#0891B2">🕒 Совещания за период <span class="count">${expMeetings.length}</span></h2>
+<table><thead><tr><th>Совещание</th><th>Дата</th><th>Время</th><th>Приоритет</th><th>Результат</th></tr></thead><tbody>
+${expMeetings.map(m=>`<tr><td><strong>${esc(m.name)}</strong>${m.desc?'<div style="color:#64748B;font-size:11px">'+esc(m.desc)+'</div>':''}</td><td>${fmt(m.start||m.deadline)}</td><td>${esc(m.timeStart||'—')}–${esc(m.timeEnd||'—')}</td><td>${esc(m.pri||'—')}</td><td>${esc(m.result||m.notes||'—')}</td></tr>`).join('')}
+</tbody></table></div>`:''}
+
 <div class="footer"><div class="logo-footer">⚡ Smart Planner</div><div>Автоматический отчёт · ${fmt(now)}</div></div>
 </body></html>`;
 setExpPreview(html);setExpGen(false)},200)};
@@ -679,6 +738,7 @@ if(loading)return<div style={{display:"flex",alignItems:"center",justifyContent:
 /* Dynamic Add button based on current tab */
 const renderAddBtn=()=>{
 if(tab==="Совещания")return<button className="add-b add-m" onClick={()=>{setEditTask(null);setShowMForm(true)}}><span>+</span> Совещание</button>;
+if(tab==="Циклы")return<button className="add-b" onClick={()=>{setEditRec(null);setShowRecForm(true)}}><span>+</span> Цикл</button>;
 return<button className="add-b" onClick={()=>{setEditTask(null);setShowForm(true)}}><span>+</span> Задача</button>;
 };
 
@@ -799,6 +859,25 @@ return<div key={d} className={`sc ${d===now?"td":""}`}>{match.map(m=><span key={
 {mtgList.length===0&&<div style={{textAlign:"center",padding:60,color:"var(--text4)"}}><div style={{fontSize:44,marginBottom:10}}>🕐</div><div style={{fontWeight:700,fontSize:16}}>Нет совещаний</div><div style={{fontSize:13,marginTop:4}}>Создайте первое — кнопка «+ Совещание» вверху</div></div>}
 </div>
 </>}
+
+{/* ═════ ЦИКЛЫ ═════ */}
+{tab==="Циклы"&&<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+<div><div style={{fontSize:22,fontWeight:800}}>🔁 Циклические действия</div><div style={{fontSize:13,color:"var(--text3)"}}>Автоматическое создание задач и совещаний по дням недели.</div></div>
+</div>
+<div style={{display:"flex",flexDirection:"column",gap:8}}>
+{(data.recurrenceRules||[]).map(r=><div key={r.id} className="tr">
+<div className="task-left" style={{background:r.itemType==="meeting"?"var(--cyan2)":"var(--accent)"}}/>
+<div style={{flex:1}}>
+<div style={{fontWeight:700}}>{r.itemType==="meeting"?"🕐":"📋"} {r.name}</div>
+<div style={{fontSize:12,color:"var(--text3)"}}>Старт: {fmt(r.startDate)} · До: {r.endDate?fmt(r.endDate):"бессрочно"} · {r.everyDay?"ежедневно":`дни: ${(r.weekdays||[]).map(i=>dayN[i]).join(", ")||"—"}`}</div>
+</div>
+<button className="bo" onClick={()=>{setEditRec(r);setShowRecForm(true)}}>✏️</button>
+<button className="bd" onClick={()=>delRec(r.id)}>Удалить</button>
+</div>)}
+{!(data.recurrenceRules||[]).length&&<div className="card" style={{textAlign:"center",padding:40,color:"var(--text3)"}}>Нет циклических правил</div>}
+</div>
+</div>}
 
 {/* ═════ СЕГОДНЯ ═════ */}
 {tab==="Сегодня"&&<>
@@ -972,7 +1051,7 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 {/* ═════ ЭКСПОРТ ═════ */}
 {tab==="Экспорт"&&<div>
 <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>📄 Экспорт отчёта</div>
-<div style={{color:"var(--text3)",fontSize:13,marginBottom:20}}>Отчёт для руководителя · только по задачам (без совещаний)</div>
+<div style={{color:"var(--text3)",fontSize:13,marginBottom:20}}>Отчёт для руководителя · задачи и совещания</div>
 <div style={{display:"grid",gridTemplateColumns:"340px 1fr",gap:20}} className="two-col">
 <div className="card" style={{alignSelf:"flex-start"}}>
 <div className="stitle"><span className="stitle-icon">🔍</span> Параметры</div>
@@ -993,12 +1072,27 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 <div>{!expPreview?<div className="card" style={{textAlign:"center",padding:60}}><div style={{fontSize:48,marginBottom:12}}>📋</div><div style={{fontWeight:700,fontSize:16}}>Предварительный просмотр</div><div style={{color:"var(--text3)",fontSize:13}}>Настройте фильтры и нажмите «Сформировать отчёт»</div></div>
 :<div><div style={{display:"flex",gap:8,marginBottom:12}}><button className="bp" onClick={printReport} style={{width:"auto",padding:"10px 24px"}}>🖨️ Печать / Сохранить PDF</button><button className="bo" onClick={()=>setExpPreview(null)}>Сбросить</button></div>
 <div className="card" style={{padding:0,overflow:"hidden"}}><iframe srcDoc={expPreview} style={{width:"100%",height:"calc(100vh - 200px)",border:"none",borderRadius:16}} title="report"/></div></div>}</div>
+</div>
+<div className="card" style={{marginTop:16}}>
+<div className="stitle"><span className="stitle-icon">🕒</span> Совещания за выбранный период ({expMeetings.length})</div>
+<div style={{display:"flex",flexDirection:"column",gap:8}}>
+{expMeetings.map(m=><div key={m.id} className="tr" onClick={()=>setDetailTask(m)}>
+<div className="task-left" style={{background:"var(--cyan2)"}}/>
+<div style={{flex:1}}>
+<div style={{fontWeight:700}}>{m.name}</div>
+<div style={{fontSize:12,color:"var(--text3)"}}>📅 {fmt(m.start||m.deadline)} {m.timeStart?`· ${m.timeStart}-${m.timeEnd||"?"}`:""} · 🎯 {m.pri}</div>
+<div style={{fontSize:12,color:"var(--text2)",marginTop:3}}><strong>Результат:</strong> {m.result||m.notes||"—"}</div>
+</div>
+</div>)}
+{!expMeetings.length&&<div style={{color:"var(--text4)",textAlign:"center",padding:20}}>Нет совещаний в выбранном периоде</div>}
+</div>
 </div></div>}
 
 </div>
 
 {showForm&&<TForm onClose={()=>{setShowForm(false);setEditTask(null)}} initial={editTask} cats={data.categories} pris={data.priorities} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
-{showMForm&&<MForm onClose={()=>{setShowMForm(false);setEditTask(null)}} initial={editTask} pris={data.priorities} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
+{showMForm&&<MForm onClose={()=>{setShowMForm(false);setEditTask(null)}} initial={editTask} pris={data.priorities} cats={data.categories} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
+{showRecForm&&<RecurrenceForm onClose={()=>{setShowRecForm(false);setEditRec(null)}} initial={editRec} cats={data.categories} pris={data.priorities} onSubmit={r=>{if(editRec)updRec(editRec.id,r);else addRec(r)}}/>}
 {detailTask&&<TDetail task={data.tasks.find(x=>x.id===detailTask.id)||detailTask} onClose={()=>setDetailTask(null)} now={now} onEdit={t=>{setDetailTask(null);setEditTask(t);if(t.type==="meeting")setShowMForm(true);else setShowForm(true)}} onDelete={delT} onProg={setProg}/>}
 {showSettings&&<Settings data={data} onClose={()=>setShowSettings(false)} onUpdate={reload} showToast={showToast}/>}
 {toast&&<Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)}/>}
