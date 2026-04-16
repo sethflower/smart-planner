@@ -4,7 +4,7 @@ Requires: pip install pywebview
 """
 import webview
 import database as db
-from api import Api
+from planner_api import Api
 
 
 def get_html():
