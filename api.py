@@ -55,6 +55,15 @@ class Api:
         ok = db.delete_priority(name)
         return "ok" if ok else "error"
 
+    def get_current_time(self):
+        """Return current date and time for notification checks."""
+        now = datetime.now()
+        return json.dumps({
+            "date": now.strftime("%Y-%m-%d"),
+            "time": now.strftime("%H:%M"),
+            "datetime": now.isoformat()
+        })
+
     def export_json(self):
         """Return JSON string for backup."""
         return db.export_data()
@@ -74,13 +83,3 @@ class Api:
             f.write(html_content)
         webbrowser.open(f"file:///{tmp}")
         return tmp
-
-    def get_current_time(self):
-        """Return current date and time as ISO string for notification checks."""
-        now = datetime.now()
-        return json.dumps({
-            "date": now.strftime("%Y-%m-%d"),
-            "time": now.strftime("%H:%M"),
-            "datetime": now.strftime("%Y-%m-%d %H:%M"),
-            "timestamp": now.timestamp(),
-        })
