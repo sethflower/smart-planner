@@ -23,6 +23,9 @@ class Api:
         tid = db.add_task(data)
         return tid
 
+    def get_notifications(self, now_iso=None):
+        return json.dumps(db.get_due_notifications(now_iso), ensure_ascii=False)
+
     def update_task(self, task_id, data_json):
         """Update existing task fields."""
         data = json.loads(data_json)
@@ -32,6 +35,20 @@ class Api:
     def delete_task(self, task_id):
         """Delete a task by id."""
         db.delete_task(task_id)
+        return "ok"
+
+    def add_recurrence_rule(self, data_json):
+        data = json.loads(data_json)
+        rid = db.add_recurrence_rule(data)
+        return rid
+
+    def update_recurrence_rule(self, rule_id, data_json):
+        data = json.loads(data_json)
+        db.update_recurrence_rule(rule_id, data)
+        return "ok"
+
+    def delete_recurrence_rule(self, rule_id):
+        db.delete_recurrence_rule(rule_id)
         return "ok"
 
     def add_category(self, name):
