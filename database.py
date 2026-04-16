@@ -15,7 +15,7 @@ def get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA foreign_keys=OFF")
     return conn
 
 
@@ -45,7 +45,7 @@ def init_db():
             name TEXT NOT NULL,
             description TEXT DEFAULT '',
             category TEXT NOT NULL DEFAULT '',
-            priority TEXT NOT NULL,
+            priority TEXT NOT NULL DEFAULT '',
             start_date TEXT,
             deadline TEXT,
             progress INTEGER DEFAULT 0,
@@ -55,13 +55,13 @@ def init_db():
             completed_at TEXT,
             type TEXT DEFAULT 'task',
             result TEXT DEFAULT '',
-            notified_overdue INTEGER DEFAULT 0,
             notified_meeting INTEGER DEFAULT 0,
+            notified_overdue INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now','localtime'))
         )
     """)
 
-    # Migration: add columns if missing
+    # Migration: add columns to existing databases if missing
     cols = [r["name"] for r in c.execute("PRAGMA table_info(tasks)").fetchall()]
     if "type" not in cols:
         c.execute("ALTER TABLE tasks ADD COLUMN type TEXT DEFAULT 'task'")
@@ -70,68 +70,12 @@ def init_db():
     if "result" not in cols:
         c.execute("ALTER TABLE tasks ADD COLUMN result TEXT DEFAULT ''")
         conn.commit()
-    if "notified_overdue" not in cols:
-        c.execute("ALTER TABLE tasks ADD COLUMN notified_overdue INTEGER DEFAULT 0")
-        conn.commit()
     if "notified_meeting" not in cols:
         c.execute("ALTER TABLE tasks ADD COLUMN notified_meeting INTEGER DEFAULT 0")
         conn.commit()
-
-    # Remove FK constraint by recreating table if needed
-    # Check if the old FK-based table exists
-    table_info = c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").fetchone()
-    if table_info and "FOREIGN KEY" in (table_info["sql"] or ""):
-        # Need to recreate table without FK constraints
-        c.execute("ALTER TABLE tasks RENAME TO tasks_old")
-        c.execute("""
-            CREATE TABLE tasks (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                category TEXT NOT NULL DEFAULT '',
-                priority TEXT NOT NULL,
-                start_date TEXT,
-                deadline TEXT,
-                progress INTEGER DEFAULT 0,
-                notes TEXT DEFAULT '',
-                time_start TEXT DEFAULT '',
-                time_end TEXT DEFAULT '',
-                completed_at TEXT,
-                type TEXT DEFAULT 'task',
-                result TEXT DEFAULT '',
-                notified_overdue INTEGER DEFAULT 0,
-                notified_meeting INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        # Copy data from old table
-        old_cols = [r["name"] for r in c.execute("PRAGMA table_info(tasks_old)").fetchall()]
-        common_cols = [col for col in old_cols if col in [
-            "id", "name", "description", "category", "priority",
-            "start_date", "deadline", "progress", "notes",
-            "time_start", "time_end", "completed_at", "type",
-            "result", "notified_overdue", "notified_meeting", "created_at"
-        ]]
-        cols_str = ",".join(common_cols)
-        c.execute(f"INSERT INTO tasks ({cols_str}) SELECT {cols_str} FROM tasks_old")
-        c.execute("DROP TABLE tasks_old")
+    if "notified_overdue" not in cols:
+        c.execute("ALTER TABLE tasks ADD COLUMN notified_overdue INTEGER DEFAULT 0")
         conn.commit()
-
-    # Migration: reassign meetings from "Совещание" category
-    meeting_count = c.execute("SELECT COUNT(*) FROM tasks WHERE type='meeting' AND category='Совещание'").fetchone()[0]
-    if meeting_count > 0:
-        c.execute("UPDATE tasks SET category='' WHERE type='meeting' AND category='Совещание'")
-        conn.commit()
-
-    # Remove legacy "Совещание" category
-    legacy_task_count = c.execute("SELECT COUNT(*) FROM tasks WHERE category='Совещание' AND type='task'").fetchone()[0]
-    if legacy_task_count == 0:
-        c.execute("DELETE FROM categories WHERE name='Совещание'")
-        conn.commit()
-
-    # Set empty category for all meetings
-    c.execute("UPDATE tasks SET category='' WHERE type='meeting' AND category='Совещание'")
-    conn.commit()
 
     # Seed defaults if empty
     cats = c.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
@@ -154,7 +98,7 @@ def init_db():
             (uid(), "Подготовить отчёт Q1", "Рабочая", "Высокий",
              "Сводный отчёт за квартал с графиками", today, off(3), 35,
              "Нужны данные от финансов", "", "", None, "task", ""),
-            (uid(), "Совещание по проекту Alpha", "", "Средний",
+            (uid(), "Совещание по проекту Alpha", "Рабочая", "Средний",
              "Еженедельный статус-митинг", today, today, 0,
              "Презентация на 5 слайдов", "10:00", "11:30", None, "meeting", ""),
             (uid(), "Обновить тарифы на сайте", "Проект", "Высокий",
@@ -165,9 +109,9 @@ def init_db():
             (uid(), "Оптимизация маршрутов", "Проект", "Высокий",
              "Зоны доставки 2 и 3", off(-7), off(7), 40,
              "Приоритет — зона 3", "", "", None, "task", ""),
-            (uid(), "Планёрка отдела логистики", "", "Высокий",
+            (uid(), "Планёрка отдела логистики", "Рабочая", "Высокий",
              "Обсуждение KPI", off(1), off(1), 0, "", "09:00", "09:45", None, "meeting", ""),
-            (uid(), "Ревью дизайна", "", "Средний",
+            (uid(), "Ревью дизайна", "Проект", "Средний",
              "Обзор макетов", off(2), off(2), 0, "", "14:00", "15:00", None, "meeting", ""),
         ]
         c.executemany("""
@@ -196,14 +140,14 @@ def get_all_data():
     cats = [r["name"] for r in conn.execute("SELECT name FROM categories ORDER BY id").fetchall()]
     pris = [r["name"] for r in conn.execute("SELECT name FROM priorities ORDER BY sort_order").fetchall()]
     tasks_raw = conn.execute("SELECT * FROM tasks ORDER BY created_at").fetchall()
-    col_names = [description[0] for description in conn.execute("SELECT * FROM tasks LIMIT 0").description]
+    col_names = [desc[0] for desc in conn.execute("SELECT * FROM tasks LIMIT 0").description]
     tasks = []
     for t in tasks_raw:
-        task_dict = {
+        task = {
             "id": t["id"],
             "name": t["name"],
             "desc": t["description"],
-            "cat": t["category"] or "",
+            "cat": t["category"],
             "pri": t["priority"],
             "start": t["start_date"],
             "deadline": t["deadline"],
@@ -215,10 +159,10 @@ def get_all_data():
             "createdAt": t["created_at"],
             "type": t["type"] if "type" in col_names else "task",
             "result": t["result"] if "result" in col_names else "",
-            "notifiedOverdue": t["notified_overdue"] if "notified_overdue" in col_names else 0,
             "notifiedMeeting": t["notified_meeting"] if "notified_meeting" in col_names else 0,
+            "notifiedOverdue": t["notified_overdue"] if "notified_overdue" in col_names else 0,
         }
-        tasks.append(task_dict)
+        tasks.append(task)
     protected = [r["name"] for r in conn.execute("SELECT name FROM categories WHERE protected=1").fetchall()]
     conn.close()
     return {
@@ -232,22 +176,23 @@ def get_all_data():
 def add_task(data):
     conn = get_conn()
     tid = uid()
-    # For meetings, category can be empty
-    category = data.get("cat", "") or ""
-    if data.get("type") == "meeting":
-        category = ""
+    cat = data.get("cat", "")
+    task_type = data.get("type", "task")
+    # For meetings, category can be empty or special — just store it
+    if task_type == "meeting" and not cat:
+        cat = ""
     conn.execute("""
         INSERT INTO tasks (id, name, description, category, priority,
             start_date, deadline, progress, notes, time_start, time_end,
             completed_at, type, result)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
-        tid, data["name"], data.get("desc", ""), category, data["pri"],
+        tid, data["name"], data.get("desc", ""), cat, data["pri"],
         data.get("start", ""), data.get("deadline", ""),
         int(data.get("progress", 0)), data.get("notes", ""),
         data.get("timeStart", ""), data.get("timeEnd", ""),
         data.get("completedAt"),
-        data.get("type", "task"),
+        task_type,
         data.get("result", ""),
     ))
     conn.commit()
@@ -266,8 +211,8 @@ def update_task(task_id, data):
         "timeStart": "time_start", "timeEnd": "time_end",
         "completedAt": "completed_at", "type": "type",
         "result": "result",
-        "notifiedOverdue": "notified_overdue",
         "notifiedMeeting": "notified_meeting",
+        "notifiedOverdue": "notified_overdue",
     }
     for js_key, db_col in mapping.items():
         if js_key in data:
@@ -362,14 +307,13 @@ def import_data(json_str):
     for t in data.get("tasks", []):
         try:
             conn.execute("""
-                INSERT OR REPLACE INTO tasks (id,name,description,category,priority,
-                    start_date,deadline,progress,notes,time_start,time_end,
-                    completed_at,type,result)
+                INSERT OR REPLACE INTO tasks (id, name, description, category, priority,
+                    start_date, deadline, progress, notes, time_start, time_end,
+                    completed_at, type, result)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 t.get("id", uid()), t["name"], t.get("desc", ""),
-                t.get("cat", ""), t["pri"], t.get("start", ""),
-                t.get("deadline", ""),
+                t.get("cat", ""), t["pri"], t.get("start", ""), t.get("deadline", ""),
                 int(t.get("progress", 0)), t.get("notes", ""),
                 t.get("timeStart", ""), t.get("timeEnd", ""),
                 t.get("completedAt"),
