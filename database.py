@@ -5,10 +5,41 @@ import sqlite3
 import json
 import uuid
 import os
+import sys
 from datetime import datetime, timedelta
 
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smart_planner.db")
+APP_DIR_NAME = "SmartPlannerPro"
+DB_FILENAME = "smart_planner.db"
+
+
+def _app_data_dir():
+    """Return writable app data directory for current OS."""
+    if os.name == "nt":
+        base = os.environ.get("APPDATA") or os.environ.get("LOCALAPPDATA")
+        if base:
+            return os.path.join(base, APP_DIR_NAME)
+    return os.path.join(os.path.expanduser("~"), f".{APP_DIR_NAME.lower()}")
+
+
+def resolve_db_path():
+    """Return stable writable DB path (important for packaged EXE)."""
+    if os.environ.get("SMART_PLANNER_DB_PATH"):
+        custom = os.path.abspath(os.environ["SMART_PLANNER_DB_PATH"])
+        os.makedirs(os.path.dirname(custom), exist_ok=True)
+        return custom
+
+    # For packaged apps (PyInstaller/cx_Freeze), code location can be read-only or temporary.
+    if getattr(sys, "frozen", False):
+        data_dir = _app_data_dir()
+        os.makedirs(data_dir, exist_ok=True)
+        return os.path.join(data_dir, DB_FILENAME)
+
+    # Dev mode: keep DB near sources for convenience.
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), DB_FILENAME)
+
+
+DB_PATH = resolve_db_path()
 
 
 def get_conn():
