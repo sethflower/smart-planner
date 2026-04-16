@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Show workspace (debug)
+      - name: Debug workspace
         shell: pwsh
         run: |
           Write-Host "GITHUB_WORKSPACE = $env:GITHUB_WORKSPACE"
@@ -36,8 +36,10 @@ jobs:
         shell: pwsh
         run: |
           Set-Location $env:GITHUB_WORKSPACE
-          pyinstaller --onefile --windowed --name "SmartPlanner" `
-            --hidden-import "api" `
+          Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
+
+          pyinstaller --clean --onefile --windowed --name "SmartPlanner" `
+            --hidden-import "planner_api" `
             --hidden-import "database" `
             --hidden-import "webview.platforms.edgechromium" `
             --hidden-import "webview.platforms.winforms" `
