@@ -1447,7 +1447,7 @@ class Api:
     def _conn(self):
         return sqlite3.connect(self.db_path)
 
-        def get_data(self):
+    def get_data(self):
         conn = self._conn()
         c = conn.cursor()
         cats = [r[0] for r in c.execute("SELECT name FROM categories ORDER BY id").fetchall()]
