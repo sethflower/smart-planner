@@ -1,22 +1,9 @@
 # Smart Planner Pro — Windows Desktop Application
 
-Полнофункциональный планировщик задач для Windows с SQLite базой данных.
-
-## Установка и запуск
-
-### 1. Убедитесь что установлен Python 3.9+
-
-Скачайте с https://python.org если не установлен.
-
-### 2. Установите зависимости
+## Установка и запуск (из исходников)
 
 ```bash
 pip install -r requirements.txt
-```
-
-### 3. Запустите приложение
-
-```bash
 python smart_planner.py
 ```
 
@@ -24,35 +11,20 @@ python smart_planner.py
 
 ```
 smart_planner_app/
-├── smart_planner.py   — Главный файл (запуск приложения)
-├── database.py        — SQLite база данных (CRUD операции)
+├── smart_planner.py   — Главный файл (pywebview + фоновый поток)
+├── database.py        — SQLite (задачи, совещания, циклы, уведомления)
 ├── api.py             — Python↔JavaScript API мост
-├── requirements.txt   — Зависимости Python
-└── smart_planner.db   — БД (создаётся автоматически при первом запуске)
+├── app.html           — Весь UI (React + CSS)
+├── requirements.txt   — Зависимости
+└── smart_planner.db   — БД (создаётся автоматически)
 ```
 
-## Функционал
+## Сборка в .exe через GitHub Actions
 
-- **Панель** — KPI-метрики, прогресс, приоритеты, категории, срочные задачи
-- **Задачи** — Полный список с фильтрацией (активные/все/готовые), сортировкой
-- **Сегодня** — Задачи на текущий день
-- **Расписание** — Недельный вид только для совещаний с временной шкалой
-- **Журнал** — Календарный вид завершённых задач по месяцам
-- **Аналитика** — Диаграммы статусов, категорий, приоритетов, продуктивности
-- **Экспорт** — Формирование PDF-отчёта с гибкой фильтрацией
+В файле `.github/workflows/build.yml` строка сборки должна быть:
 
-### Особенности
+```
+pyinstaller --onefile --windowed --name "SmartPlanner" --add-data "app.html;." --hidden-import "webview.platforms.edgechromium" --hidden-import "webview.platforms.winforms" --hidden-import "clr_loader" --collect-all "webview" smart_planner.py
+```
 
-- Категория «Совещание» защищена от удаления/изменения
-- При выборе категории «Совещание» появляются поля времени начала/окончания
-- Детали задачи можно развернуть на весь экран
-- Данные хранятся в SQLite (файл `smart_planner.db`)
-- Экспорт/импорт данных в JSON
-- Экспорт отчёта в PDF через системную печать
-
-## Технологии
-
-- **Python** + **pywebview** — нативное окно Windows
-- **SQLite** — база данных
-- **React 18** — UI (рендерится в embedded web view)
-- **DM Sans** + **IBM Plex Mono** — шрифты
+**Важно:** ключ `--add-data "app.html;."` обязателен.

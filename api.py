@@ -14,79 +14,69 @@ class Api:
     """Exposed to JavaScript via pywebview.api"""
 
     def get_data(self):
-        """Load all data from SQLite."""
         return json.dumps(db.get_all_data(), ensure_ascii=False)
 
     def add_task(self, data_json):
-        """Add a new task. Returns new task id."""
         data = json.loads(data_json)
-        tid = db.add_task(data)
-        return tid
-
-    def get_notifications(self, now_iso=None):
-        return json.dumps(db.get_due_notifications(now_iso), ensure_ascii=False)
+        return db.add_task(data)
 
     def update_task(self, task_id, data_json):
-        """Update existing task fields."""
         data = json.loads(data_json)
         db.update_task(task_id, data)
         return "ok"
 
     def delete_task(self, task_id):
-        """Delete a task by id."""
         db.delete_task(task_id)
         return "ok"
 
-    def add_recurrence_rule(self, data_json):
-        data = json.loads(data_json)
-        rid = db.add_recurrence_rule(data)
-        return rid
-
-    def update_recurrence_rule(self, rule_id, data_json):
-        data = json.loads(data_json)
-        db.update_recurrence_rule(rule_id, data)
-        return "ok"
-
-    def delete_recurrence_rule(self, rule_id):
-        db.delete_recurrence_rule(rule_id)
-        return "ok"
-
     def add_category(self, name):
-        ok = db.add_category(name)
-        return "ok" if ok else "exists"
+        return "ok" if db.add_category(name) else "exists"
 
     def delete_category(self, name):
-        if db.is_category_protected(name):
-            return "protected"
-        ok = db.delete_category(name)
-        return "ok" if ok else "protected"
-
-    def is_category_protected(self, name):
-        return db.is_category_protected(name)
+        db.delete_category(name)
+        return "ok"
 
     def add_priority(self, name):
-        ok = db.add_priority(name)
-        return "ok" if ok else "exists"
+        return "ok" if db.add_priority(name) else "exists"
 
     def delete_priority(self, name):
-        ok = db.delete_priority(name)
-        return "ok" if ok else "error"
+        db.delete_priority(name)
+        return "ok"
 
-    def export_json(self):
-        """Return JSON string for backup."""
-        return db.export_data()
+    # ─── Recurring ────────────────────────────
+    def add_recurring(self, data_json):
+        data = json.loads(data_json)
+        rid = db.add_recurring(data)
+        db.generate_recurring_tasks()
+        return rid
 
-    def import_json(self, json_str):
-        """Import from JSON backup."""
-        try:
-            db.import_data(json_str)
-            return "ok"
-        except Exception as e:
-            return f"error: {e}"
+    def update_recurring(self, rec_id, data_json):
+        data = json.loads(data_json)
+        db.update_recurring(rec_id, data)
+        db.propagate_recurring_edit(rec_id, data)
+        db.generate_recurring_tasks()
+        return "ok"
 
+    def delete_recurring(self, rec_id, remove_future):
+        rf = remove_future if isinstance(remove_future, bool) else str(remove_future).lower() == "true"
+        db.delete_recurring(rec_id, rf)
+        return "ok"
+
+    def generate_recurring(self):
+        """Trigger recurring task generation. Returns list of new ids."""
+        return db.generate_recurring_tasks()
+
+    # ─── Notifications ────────────────────────
+    def get_notifications(self):
+        """Returns pending notifications as JSON string."""
+        return json.dumps(db.get_pending_notifications(), ensure_ascii=False)
+
+    # ─── Report ───────────────────────────────
     def save_pdf_report(self, html_content):
-        """Save HTML report to temp file and open in browser for printing to PDF."""
-        tmp = os.path.join(tempfile.gettempdir(), f"smart_planner_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html")
+        tmp = os.path.join(
+            tempfile.gettempdir(),
+            f"smart_planner_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+        )
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(html_content)
         webbrowser.open(f"file:///{tmp}")
