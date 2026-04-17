@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 
 
 def get_db_path():
-    """Возвращает путь к БД. В режиме .exe — рядом с .exe, иначе со скриптом."""
     if getattr(sys, "frozen", False):
         base_dir = os.path.dirname(sys.executable)
     else:
@@ -62,8 +61,8 @@ def init_db():
             time_end TEXT DEFAULT '',
             completed_at TEXT,
             type TEXT DEFAULT 'task',
-            task_result TEXT DEFAULT '',
             meeting_result TEXT DEFAULT '',
+            task_result TEXT DEFAULT '',
             recurring_id TEXT,
             notified_start INTEGER DEFAULT 0,
             notified_overdue INTEGER DEFAULT 0,
@@ -99,12 +98,12 @@ def init_db():
         )
     """)
 
-    # Migrations for older DBs
+    # Migrations
     cols = [r["name"] for r in c.execute("PRAGMA table_info(tasks)").fetchall()]
     migrations = [
         ("type", "ALTER TABLE tasks ADD COLUMN type TEXT DEFAULT 'task'"),
-        ("task_result", "ALTER TABLE tasks ADD COLUMN task_result TEXT DEFAULT ''"),
         ("meeting_result", "ALTER TABLE tasks ADD COLUMN meeting_result TEXT DEFAULT ''"),
+        ("task_result", "ALTER TABLE tasks ADD COLUMN task_result TEXT DEFAULT ''"),
         ("recurring_id", "ALTER TABLE tasks ADD COLUMN recurring_id TEXT"),
         ("notified_start", "ALTER TABLE tasks ADD COLUMN notified_start INTEGER DEFAULT 0"),
         ("notified_overdue", "ALTER TABLE tasks ADD COLUMN notified_overdue INTEGER DEFAULT 0"),
@@ -116,7 +115,6 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
 
-    # Fix old schema: mark old-style 'Совещание' rows as meetings
     c.execute("UPDATE tasks SET type='meeting' WHERE category='Совещание' AND (type IS NULL OR type='task')")
 
     first_cat = c.execute("SELECT name FROM categories WHERE name!='Совещание' ORDER BY id LIMIT 1").fetchone()
@@ -139,20 +137,21 @@ def init_db():
         seed = [
             (uid(), "Подготовить отчёт Q1", "Рабочая", "Высокий",
              "Сводный отчёт за квартал с графиками", today, off(3), 35,
-             "Нужны данные от финансов", "", "", None, "task", "", None),
+             "Нужны данные от финансов", "", "", None, "task", "", "", None),
             (uid(), "Совещание по проекту Alpha", "Рабочая", "Средний",
              "Еженедельный статус-митинг", today, today, 0,
-             "Презентация на 5 слайдов", "10:00", "11:30", None, "meeting", "", None),
+             "Презентация на 5 слайдов", "10:00", "11:30", None, "meeting", "", "", None),
             (uid(), "Обновить тарифы на сайте", "Проект", "Высокий",
              "Актуализация цен", off(-5), off(-1), 45,
-             "Согласовать с маркетингом", "", "", None, "task", "", None),
+             "Согласовать с маркетингом", "", "", None, "task", "", "", None),
             (uid(), "Планёрка отдела логистики", "Рабочая", "Высокий",
-             "Обсуждение KPI", off(1), off(1), 0, "", "09:00", "09:45", None, "meeting", "", None),
+             "Обсуждение KPI", off(1), off(1), 0, "", "09:00", "09:45", None, "meeting", "", "", None),
         ]
         c.executemany("""
             INSERT INTO tasks (id, name, category, priority, description,
-                start_date, deadline, progress, notes, time_start, time_end, completed_at, type, meeting_result, recurring_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                start_date, deadline, progress, notes, time_start, time_end, completed_at,
+                type, meeting_result, task_result, recurring_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, seed)
 
     conn.commit()
@@ -166,8 +165,6 @@ def uid():
 def off(n):
     return (datetime.now() + timedelta(days=n)).strftime("%Y-%m-%d")
 
-
-# ─── TASKS & MEETINGS ───────────────────────────────────────────
 
 def get_all_data():
     conn = get_conn()
@@ -192,8 +189,8 @@ def get_all_data():
             "completedAt": t["completed_at"],
             "createdAt": t["created_at"],
             "type": (t["type"] if "type" in keys else "task") or "task",
-            "taskResult": (t["task_result"] if "task_result" in keys else "") or "",
             "meetingResult": (t["meeting_result"] if "meeting_result" in keys else "") or "",
+            "taskResult": (t["task_result"] if "task_result" in keys else "") or "",
             "recurringId": (t["recurring_id"] if "recurring_id" in keys else None),
         })
     rec_raw = conn.execute("SELECT * FROM recurring ORDER BY created_at DESC").fetchall()
@@ -228,7 +225,7 @@ def add_task(data):
     conn.execute("""
         INSERT OR REPLACE INTO tasks (id, name, description, category, priority,
             start_date, deadline, progress, notes, time_start, time_end, completed_at,
-            type, task_result, meeting_result, recurring_id)
+            type, meeting_result, task_result, recurring_id)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         tid, data["name"], data.get("desc", ""), data.get("cat", ""), data["pri"],
@@ -237,8 +234,8 @@ def add_task(data):
         data.get("timeStart", ""), data.get("timeEnd", ""),
         data.get("completedAt"),
         data.get("type", "task"),
-        data.get("taskResult", ""),
         data.get("meetingResult", ""),
+        data.get("taskResult", ""),
         data.get("recurringId"),
     ))
     conn.commit()
@@ -254,8 +251,8 @@ def update_task(task_id, data):
         "progress": "progress", "notes": "notes",
         "timeStart": "time_start", "timeEnd": "time_end",
         "completedAt": "completed_at", "type": "type",
-        "taskResult": "task_result",
         "meetingResult": "meeting_result",
+        "taskResult": "task_result",
         "notifiedStart": "notified_start",
         "notifiedOverdue": "notified_overdue",
     }
@@ -277,8 +274,6 @@ def delete_task(task_id):
     conn.commit()
     conn.close()
 
-
-# ─── RECURRING RULES ────────────────────────────────────────────
 
 def add_recurring(data):
     conn = get_conn()
@@ -339,7 +334,6 @@ def delete_recurring(rec_id, remove_future=False):
 
 
 def propagate_recurring_edit(rec_id, patch):
-    """Apply changes to all future (and today) not-completed generated tasks."""
     conn = get_conn()
     today = datetime.now().strftime("%Y-%m-%d")
     sync_map = {
@@ -373,13 +367,8 @@ def propagate_recurring_edit(rec_id, patch):
 
 
 def generate_recurring_tasks():
-    """Generate instances for active recurring rules.
-    - Meetings: created up to today+30 days (so they appear in the calendar ahead of time)
-    - Tasks: by default created only for today (configurable via settings)
-    """
     conn = get_conn()
     today = datetime.now().date()
-    # Read settings for horizons
     settings = get_settings()
     meeting_horizon_days = settings.get("cycles_meeting_horizon_days", 30)
     task_ahead = settings.get("cycles_task_create_ahead", False)
@@ -390,7 +379,6 @@ def generate_recurring_tasks():
     meeting_horizon = today + timedelta(days=meeting_horizon_days)
     rules = conn.execute("SELECT * FROM recurring WHERE active=1").fetchall()
 
-    # Enforce max active cycles
     if max_active > 0 and len(rules) > max_active:
         rules = rules[:max_active]
 
@@ -422,13 +410,9 @@ def generate_recurring_tasks():
             last_day = min(horizon, rule_end_raw) if rule_end_raw else horizon
         else:
             if task_ahead:
-                # User chose to create tasks ahead of time too
                 task_horizon = today + timedelta(days=task_horizon_days)
-                horizon = task_horizon
                 last_day = min(task_horizon, rule_end_raw) if rule_end_raw else task_horizon
             else:
-                # Default: tasks only for today
-                horizon = today
                 last_day = min(today, rule_end_raw) if rule_end_raw else today
 
         day = max(rule_start, today)
@@ -447,13 +431,13 @@ def generate_recurring_tasks():
                     conn.execute("""
                         INSERT INTO tasks (id, name, description, category, priority,
                             start_date, deadline, progress, notes, time_start, time_end,
-                            completed_at, type, meeting_result, recurring_id)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            completed_at, type, meeting_result, task_result, recurring_id)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """, (
                         tid, rule["name"], rule["description"] or "", rule["category"] or "",
                         rule["priority"], day_iso, deadline, 0, rule["notes"] or "",
                         rule["time_start"] or "", rule["time_end"] or "",
-                        None, rule["kind"], "", rule["id"],
+                        None, rule["kind"], "", "", rule["id"],
                     ))
                     created.append(tid)
             day += timedelta(days=1)
@@ -461,7 +445,6 @@ def generate_recurring_tasks():
         conn.execute("UPDATE recurring SET last_generated=? WHERE id=?",
                      (last_day.strftime("%Y-%m-%d"), rule["id"]))
 
-    # Auto-delete old completed recurring instances
     if auto_del_days > 0:
         cutoff = (today - timedelta(days=auto_del_days)).strftime("%Y-%m-%d")
         conn.execute("""
@@ -474,10 +457,7 @@ def generate_recurring_tasks():
     return created
 
 
-# ─── NOTIFICATIONS ──────────────────────────────────────────────
-
 def get_pending_notifications():
-    """Returns list of new notifications to show and marks them as notified."""
     settings = get_settings()
     if not settings.get("notifications_enabled", True):
         return []
@@ -488,7 +468,6 @@ def get_pending_notifications():
     notifications = []
     minutes_before = settings.get("notifications_meeting_minutes_before", 5)
 
-    # Meetings starting within N minutes
     meetings = conn.execute("""
         SELECT * FROM tasks
         WHERE type='meeting' AND notified_start=0 AND (progress IS NULL OR progress < 100)
@@ -512,7 +491,6 @@ def get_pending_notifications():
         except (ValueError, AttributeError):
             pass
 
-    # Tasks: just became overdue (if enabled)
     if settings.get("notifications_overdue_enabled", True):
         overdue = conn.execute("""
             SELECT * FROM tasks
@@ -532,8 +510,6 @@ def get_pending_notifications():
     conn.close()
     return notifications
 
-
-# ─── CATEGORIES & PRIORITIES ────────────────────────────────────
 
 def add_category(name):
     conn = get_conn()
@@ -576,59 +552,33 @@ def delete_priority(name):
     return True
 
 
-# ─── SETTINGS ──────────────────────────────────────────────────
-
 import json as _json
 
 DEFAULT_SETTINGS = {
-    # ── Language ──
-    "lang": "ru",  # "ru" | "uk"
-
-    # ── Visible tabs ──
+    "lang": "ru",
     "tabs_visible": {
-        "panel": True,
-        "tasks": True,
-        "meetings": True,
-        "cycles": True,
-        "today": True,
-        "journal": True,
-        "analytics": True,
-        "export": True,
-        "settings": True,
+        "panel": True, "tasks": True, "meetings": True, "cycles": True,
+        "today": True, "journal": True, "analytics": True, "export": True, "settings": True,
     },
-
-    # ── App branding ──
     "app_name": "Smart Planner",
-    "logo_base64": "",  # user-uploaded PNG as data URL
-
-    # ── Panel ──
+    "logo_base64": "",
     "panel_default_period": "all",
     "panel_show_priorities": True,
     "panel_show_categories": True,
     "panel_show_urgent": True,
     "panel_show_progress_bar": True,
-
-    # ── Tasks ──
     "tasks_default_filter": "active",
     "tasks_default_sort": "deadline",
     "tasks_show_completed_date": True,
     "tasks_show_recurring_badge": True,
-
-    # ── Meetings ──
     "meetings_show_calendar": True,
     "meetings_default_filter": "upcoming",
     "meetings_default_sort": "date",
     "meetings_show_result_preview": True,
-
-    # ── Today ──
     "today_default_sort": "priority",
     "today_show_meetings": True,
     "today_show_tasks": True,
-
-    # ── Journal ──
     "journal_show_description": False,
-
-    # ── Analytics ──
     "analytics_default_period": "all",
     "analytics_show_status_chart": True,
     "analytics_show_category_chart": True,
@@ -637,41 +587,31 @@ DEFAULT_SETTINGS = {
     "analytics_show_timeline": True,
     "analytics_show_heatmap": True,
     "analytics_show_upcoming": True,
-
-    # ── Export ──
     "export_include_meetings": True,
     "export_default_period_days": 30,
-
-    # ── Notifications ──
     "notifications_enabled": True,
     "notifications_meeting_minutes_before": 5,
     "notifications_overdue_enabled": True,
-
-    # ── Recurring / Cycles ──
     "cycles_meeting_horizon_days": 30,
-    "cycles_task_create_ahead": False,  # False = only today, True = ahead like meetings
-    "cycles_task_horizon_days": 30,     # used only if create_ahead is True
-    "cycles_max_active": 0,            # 0 = unlimited
-    "cycles_auto_delete_old_days": 0,  # 0 = never, >0 = delete completed older than N days
-
-    # ── Display ──
+    "cycles_task_create_ahead": False,
+    "cycles_task_horizon_days": 30,
+    "cycles_max_active": 0,
+    "cycles_auto_delete_old_days": 0,
     "display_compact_mode": False,
     "display_animations": True,
 }
 
 
 def get_settings():
-    """Return merged settings: defaults + user overrides from DB."""
     conn = get_conn()
     rows = conn.execute("SELECT key, value FROM settings").fetchall()
     conn.close()
-    result = _json.loads(_json.dumps(DEFAULT_SETTINGS))  # deep copy
+    result = _json.loads(_json.dumps(DEFAULT_SETTINGS))
     for row in rows:
         try:
             val = _json.loads(row["value"])
         except (_json.JSONDecodeError, TypeError):
             val = row["value"]
-        # Handle nested dicts
         if isinstance(val, dict) and isinstance(result.get(row["key"]), dict):
             result[row["key"]].update(val)
         else:
@@ -680,7 +620,6 @@ def get_settings():
 
 
 def save_setting(key, value):
-    """Save a single setting key."""
     conn = get_conn()
     val_str = _json.dumps(value, ensure_ascii=False)
     conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, val_str))
@@ -689,7 +628,6 @@ def save_setting(key, value):
 
 
 def save_settings_bulk(settings_dict):
-    """Save multiple settings at once."""
     conn = get_conn()
     for key, value in settings_dict.items():
         val_str = _json.dumps(value, ensure_ascii=False)
@@ -699,7 +637,6 @@ def save_settings_bulk(settings_dict):
 
 
 def reset_settings():
-    """Reset all settings to defaults."""
     conn = get_conn()
     conn.execute("DELETE FROM settings")
     conn.commit()
