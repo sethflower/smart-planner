@@ -360,10 +360,13 @@ def propagate_recurring_edit(rec_id, patch):
 
 
 def generate_recurring_tasks():
-    """Generate instances for all active rules up to today+30 days."""
+    """Generate instances for active recurring rules.
+    - Meetings: created up to today+30 days (so they appear in the calendar ahead of time)
+    - Tasks: created only for today (appear on the day they are due)
+    """
     conn = get_conn()
     today = datetime.now().date()
-    horizon = today + timedelta(days=30)
+    meeting_horizon = today + timedelta(days=30)
     rules = conn.execute("SELECT * FROM recurring WHERE active=1").fetchall()
     created = []
 
@@ -382,12 +385,22 @@ def generate_recurring_tasks():
         except Exception:
             rule_start = today
         try:
-            rule_end = datetime.strptime(rule["end_date"], "%Y-%m-%d").date() if rule["end_date"] else horizon
+            rule_end_raw = datetime.strptime(rule["end_date"], "%Y-%m-%d").date() if rule["end_date"] else None
         except Exception:
-            rule_end = horizon
+            rule_end_raw = None
+
+        is_meeting = (rule["kind"] == "meeting")
+
+        if is_meeting:
+            # Meetings: generate up to 30 days ahead so they show in the weekly calendar
+            horizon = meeting_horizon
+            last_day = min(horizon, rule_end_raw) if rule_end_raw else horizon
+        else:
+            # Tasks: only generate for today
+            horizon = today
+            last_day = min(today, rule_end_raw) if rule_end_raw else today
 
         day = max(rule_start, today)
-        last_day = min(horizon, rule_end)
         dd = rule["deadline_days"] or 0
 
         while day <= last_day:
