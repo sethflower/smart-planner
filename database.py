@@ -62,6 +62,7 @@ def init_db():
             time_end TEXT DEFAULT '',
             completed_at TEXT,
             type TEXT DEFAULT 'task',
+            task_result TEXT DEFAULT '',
             meeting_result TEXT DEFAULT '',
             recurring_id TEXT,
             notified_start INTEGER DEFAULT 0,
@@ -102,6 +103,7 @@ def init_db():
     cols = [r["name"] for r in c.execute("PRAGMA table_info(tasks)").fetchall()]
     migrations = [
         ("type", "ALTER TABLE tasks ADD COLUMN type TEXT DEFAULT 'task'"),
+        ("task_result", "ALTER TABLE tasks ADD COLUMN task_result TEXT DEFAULT ''"),
         ("meeting_result", "ALTER TABLE tasks ADD COLUMN meeting_result TEXT DEFAULT ''"),
         ("recurring_id", "ALTER TABLE tasks ADD COLUMN recurring_id TEXT"),
         ("notified_start", "ALTER TABLE tasks ADD COLUMN notified_start INTEGER DEFAULT 0"),
@@ -190,6 +192,7 @@ def get_all_data():
             "completedAt": t["completed_at"],
             "createdAt": t["created_at"],
             "type": (t["type"] if "type" in keys else "task") or "task",
+            "taskResult": (t["task_result"] if "task_result" in keys else "") or "",
             "meetingResult": (t["meeting_result"] if "meeting_result" in keys else "") or "",
             "recurringId": (t["recurring_id"] if "recurring_id" in keys else None),
         })
@@ -225,8 +228,8 @@ def add_task(data):
     conn.execute("""
         INSERT OR REPLACE INTO tasks (id, name, description, category, priority,
             start_date, deadline, progress, notes, time_start, time_end, completed_at,
-            type, meeting_result, recurring_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            type, task_result, meeting_result, recurring_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         tid, data["name"], data.get("desc", ""), data.get("cat", ""), data["pri"],
         data.get("start", ""), data.get("deadline", ""),
@@ -234,6 +237,7 @@ def add_task(data):
         data.get("timeStart", ""), data.get("timeEnd", ""),
         data.get("completedAt"),
         data.get("type", "task"),
+        data.get("taskResult", ""),
         data.get("meetingResult", ""),
         data.get("recurringId"),
     ))
@@ -250,6 +254,7 @@ def update_task(task_id, data):
         "progress": "progress", "notes": "notes",
         "timeStart": "time_start", "timeEnd": "time_end",
         "completedAt": "completed_at", "type": "type",
+        "taskResult": "task_result",
         "meetingResult": "meeting_result",
         "notifiedStart": "notified_start",
         "notifiedOverdue": "notified_overdue",
@@ -699,4 +704,3 @@ def reset_settings():
     conn.execute("DELETE FROM settings")
     conn.commit()
     conn.close()
-
