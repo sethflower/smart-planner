@@ -13,9 +13,8 @@ from api import Api
 
 
 def _resource_path(rel):
-    """Work both in dev mode and as PyInstaller bundle."""
     if getattr(sys, "frozen", False):
-        base = sys._MEIPASS  # PyInstaller temp dir
+        base = sys._MEIPASS
     else:
         base = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base, rel)
@@ -28,7 +27,6 @@ def _load_html():
 
 
 def background_worker(window_ref):
-    """Generate recurring tasks daily, poll notifications every 30s."""
     last_gen_date = None
     while True:
         try:
