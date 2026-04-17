@@ -244,7 +244,9 @@ const CC={"Рабочая":"#4361EE","Проект":"#059669","Обучение"
 const PC={"Высокий":"#EF4444","Средний":"#F59E0B","Низкий":"#10B981"};
 const PB={"Высокий":"var(--red-bg)","Средний":"var(--amber-bg)","Низкий":"var(--green-bg)"};
 const gc=n=>CC[n]||"#636E72";const gp=n=>PC[n]||"#636E72";const gb=n=>PB[n]||"var(--bg3)";
-function getS(t,now){if(!t.name)return{l:" ",i:"",c:"var(--text3)"};if(t.progress>=100)return{l:"Выполнено",i:"\u2705",c:"var(--green)"};if(t.deadline&&t.deadline<now&&t.progress<100)return{l:"Просрочено",i:"\ud83d\udd34",c:"var(--red)"};if(t.deadline){const dl=diffD(t.deadline,now);if(dl>=0&&dl<=2)return{l:"Горит",i:"\u26a0\ufe0f",c:"var(--amber)"};}if(t.progress>0)return{l:"В работе",i:"\ud83d\udd04",c:"var(--accent)"};return{l:"Новая",i:"\ud83c\udd95",c:"var(--text3)"};}
+function taskState(t,now){if(!t.name)return"empty";if(t.progress>=100)return"done";if(t.deadline&&t.deadline<now&&t.progress<100)return"overdue";if(t.deadline){const dl=diffD(t.deadline,now);if(dl>=0&&dl<=2)return"burning";}if(t.progress>0)return"in_progress";return"new";}
+function stateLabel(code){const map={done:"Выполнено",overdue:"Просрочено",burning:"Горит",in_progress:"В работе",new:"Новая",empty:" "};return map[code]||map.empty}
+function getS(t,now){const code=taskState(t,now);const v={done:{i:"\u2705",c:"var(--green)"},overdue:{i:"\ud83d\udd34",c:"var(--red)"},burning:{i:"\u26a0\ufe0f",c:"var(--amber)"},in_progress:{i:"\ud83d\udd04",c:"var(--accent)"},new:{i:"\ud83c\udd95",c:"var(--text3)"},empty:{i:"",c:"var(--text3)"}}[code];return{code,l:stateLabel(code),...v};}
 function getMS(m,now){if(!m.name)return{l:" ",c:"var(--text3)"};if(m.progress>=100||m.completedAt)return{l:"Завершено",c:"var(--green)"};if(m.deadline&&m.deadline<now)return{l:"Прошло",c:"var(--text3)"};if(m.start===now||m.deadline===now)return{l:"Сегодня",c:"var(--amber)"};if(m.start&&m.start>now)return{l:"Запланировано",c:"var(--cyan2)"};return{l:"Активно",c:"var(--accent)"};}
 function periodRange(p){const n=new Date();if(p==="all")return[null,null];if(p==="today"){const d=td();return[d,d]}if(p==="week"){const d=new Date(n);d.setDate(d.getDate()-7);return[d.toISOString().split("T")[0],td()]}if(p==="month"){const d=new Date(n);d.setMonth(d.getMonth()-1);return[d.toISOString().split("T")[0],td()]}if(p==="quarter"){const d=new Date(n);d.setMonth(d.getMonth()-3);return[d.toISOString().split("T")[0],td()]}if(p==="year"){const d=new Date(n);d.setFullYear(d.getFullYear()-1);return[d.toISOString().split("T")[0],td()]}return[null,null]}
 function inPeriod(t,from,to){if(!from&&!to)return true;const dates=[t.start,t.deadline,t.createdAt&&t.createdAt.slice(0,10),t.completedAt].filter(Boolean);if(!dates.length)return true;return dates.some(d=>(!from||d>=from)&&(!to||d<=to))}
@@ -257,7 +259,7 @@ function DonutChart({segments,size=140,thickness=24}){const r=size/2;const cr=r-
 
 /* ─── Task form ─── */
 function TForm({onClose,initial,onSubmit,cats,pris}){
-const[f,setF]=useState(initial?{...initial}:{name:"",cat:cats[0]||"",pri:pris[1]||pris[0]||"",desc:"",start:td(),deadline:"",progress:0,notes:""});
+const[f,setF]=useState(initial?{...initial}:{name:"",cat:cats[0]||"",pri:pris[1]||pris[0]||"",desc:"",start:td(),deadline:"",progress:0,notes:"",taskResult:""});
 const s=(k,v)=>setF(p=>({...p,[k]:v}));
 const go=()=>{if(!f.name.trim())return;onSubmit({...f,progress:parseInt(f.progress)||0,type:"task"});onClose()};
 return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.stopPropagation()}>
@@ -273,6 +275,7 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 <div className="fl"><label>Дата начала</label><input type="date" value={f.start||""} onChange={e=>s("start",e.target.value)}/></div>
 <div className="fl"><label>Дедлайн</label><input type="date" value={f.deadline||""} onChange={e=>s("deadline",e.target.value)}/></div>
 </div>
+<div className="fl"><label>Результат по задаче</label><textarea value={f.taskResult||""} onChange={e=>s("taskResult",e.target.value)} placeholder="Что получено по итогам выполнения задачи?"/></div>
 <div className="fl"><label>Заметки</label><textarea value={f.notes} onChange={e=>s("notes",e.target.value)}/></div>
 <button className="bp" onClick={go}>{initial?"💾 Сохранить":"➕ Добавить"}</button>
 </div></div></div></div>}
@@ -362,12 +365,15 @@ function TDetail({task,onClose,onEdit,onDelete,onProg,onSaveResult,now}){
 const st=getS(task,now);const dl=task.deadline?diffD(task.deadline,now):null;
 const[cd,setCd]=useState(false);const[cf,setCf]=useState(false);const[full,setFull]=useState(false);
 const[resultText,setResultText]=useState(task.meetingResult||"");
+const[taskResultText,setTaskResultText]=useState(task.taskResult||"");
 const[resultEdited,setResultEdited]=useState(false);
+const[taskResultEdited,setTaskResultEdited]=useState(false);
 const isM=task.type==="meeting";
 const isPast=task.deadline&&task.deadline<now;
 const panelStyle=full?{position:"fixed",inset:0,width:"100%",background:"#fff",boxShadow:"none",zIndex:999,display:"flex",flexDirection:"column",animation:"fi .2s",borderLeft:"none"}:{};
-useEffect(()=>{setResultText(task.meetingResult||"");setResultEdited(false)},[task.id,task.meetingResult]);
+useEffect(()=>{setResultText(task.meetingResult||"");setResultEdited(false);setTaskResultText(task.taskResult||"");setTaskResultEdited(false)},[task.id,task.meetingResult,task.taskResult]);
 const saveResult=()=>{onSaveResult(task.id,resultText);setResultEdited(false)};
+const saveTaskResult=()=>{onSaveResult(task.id,taskResultText,true);setTaskResultEdited(false)};
 return<><div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex:998}} onClick={onClose}/>
 <div className={full?"":"dp"} style={full?panelStyle:{}}>
 <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",background:isM?"var(--cyan-bg)":"var(--bg3)"}}>
@@ -411,6 +417,13 @@ return<><div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.4)",zIndex
 </div>
 <textarea value={resultText} onChange={e=>{setResultText(e.target.value);setResultEdited(true)}} placeholder="Запишите итоги совещания: решения, поручения, договорённости..." style={{padding:12,borderRadius:10,border:"1.5px solid var(--border)",fontSize:14,color:"var(--text)",background:"#fff",outline:"none",width:"100%",minHeight:100,resize:"vertical",fontFamily:"var(--font)",lineHeight:1.5}}/>
 {!isPast&&!resultText&&<div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>💡 Можно заполнить как до начала, так и после окончания совещания</div>}
+</div>}
+{!isM&&<div style={{marginBottom:20,padding:16,background:"var(--accent-bg)",borderRadius:12,border:"1px solid rgba(67,97,238,.2)"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+<div style={{fontSize:11,fontWeight:700,color:"var(--accent)",textTransform:"uppercase"}}>📝 Результат по задаче</div>
+{taskResultEdited&&<button className="bp" onClick={saveTaskResult} style={{width:"auto",padding:"6px 14px",fontSize:12}}>💾 Сохранить</button>}
+</div>
+<textarea value={taskResultText} onChange={e=>{setTaskResultText(e.target.value);setTaskResultEdited(true)}} placeholder="Зафиксируйте итог, статус результата, ссылки и договорённости..." style={{padding:12,borderRadius:10,border:"1.5px solid var(--border)",fontSize:14,color:"var(--text)",background:"#fff",outline:"none",width:"100%",minHeight:92,resize:"vertical",fontFamily:"var(--font)",lineHeight:1.5}}/>
 </div>}
 
 {task.notes&&<div style={{marginBottom:18}}><div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>Заметки</div><div style={{background:"var(--bg)",borderRadius:12,padding:14,fontSize:14,color:"var(--text2)",lineHeight:1.6,border:"1px solid var(--border)"}}>{task.notes}</div></div>}
@@ -460,7 +473,7 @@ function KpiDrill({kpi,tasks,now,onClose,onOpenTask}){
 const titles={total:"Все задачи",done:"Выполненные задачи",active:"Задачи в работе",burn:"Горящие задачи",over:"Просроченные задачи"};
 const icons={total:"📋",done:"✅",active:"🔄",burn:"⚠️",over:"🔴"};
 const colors={total:"var(--accent)",done:"var(--green)",active:"var(--accent)",burn:"var(--amber)",over:"var(--red)"};
-const flt={total:t=>t.name,done:t=>t.name&&getS(t,now).l==="Выполнено",active:t=>t.name&&getS(t,now).l!=="Выполнено",burn:t=>t.name&&getS(t,now).l==="Горит",over:t=>t.name&&getS(t,now).l==="Просрочено"}[kpi];
+const flt={total:t=>t.name,done:t=>t.name&&taskState(t,now)==="done",active:t=>t.name&&taskState(t,now)!=="done",burn:t=>t.name&&taskState(t,now)==="burning",over:t=>t.name&&taskState(t,now)==="overdue"}[kpi];
 const f=tasks.filter(flt);
 return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.stopPropagation()} style={{width:"min(720px,94vw)"}}>
 <div className="mh" style={{borderTop:`4px solid ${colors[kpi]}`}}><h3>{icons[kpi]} {titles[kpi]} <span style={{fontWeight:500,fontSize:13,color:"var(--text3)",marginLeft:8}}>({f.length})</span></h3><button className="mc" onClick={onClose}>×</button></div>
@@ -692,7 +705,7 @@ const addT=async t=>{try{await callApi("add_task",JSON.stringify(t));await reloa
 const updT=async(id,patch)=>{try{await callApi("update_task",id,JSON.stringify(patch));await reload()}catch(e){showToast("Ошибка","error")}};
 const delT=async id=>{await callApi("delete_task",id);setDetailTask(null);reload()};
 const setProg=async(id,p)=>{const patch=p>=100?{progress:p,completedAt:td()}:{progress:p,completedAt:null};await callApi("update_task",id,JSON.stringify(patch));if(detailTask&&detailTask.id===id)setDetailTask(prev=>({...prev,...patch}));reload()};
-const saveResult=async(id,text)=>{await callApi("update_task",id,JSON.stringify({meetingResult:text}));showToast("Результат сохранён");reload()};
+const saveResult=async(id,text,isTask=false)=>{await callApi("update_task",id,JSON.stringify(isTask?{taskResult:text}:{meetingResult:text}));showToast("Результат сохранён");reload()};
 
 /* Recurring CRUD */
 const addRec=async r=>{try{await callApi("add_recurring",JSON.stringify(r));showToast("Цикл создан");reload()}catch(e){showToast("Ошибка","error")}};
@@ -706,14 +719,14 @@ const meetings=useMemo(()=>data.tasks.filter(t=>t.type==="meeting"),[data.tasks]
 /* Panel period filter */
 const[pFrom,pTo]=periodRange(panelPeriod);
 const panelTasks=useMemo(()=>tasksOnly.filter(t=>inPeriod(t,pFrom,pTo)),[tasksOnly,pFrom,pTo]);
-const stats=useMemo(()=>{const s={total:0,done:0,active:0,burn:0,over:0};panelTasks.forEach(t=>{if(!t.name)return;s.total++;const st=getS(t,now).l;if(st==="Выполнено")s.done++;else if(st==="В работе")s.active++;else if(st==="Горит"){s.burn++;s.active++}else if(st==="Просрочено")s.over++;else s.active++});s.pct=s.total?Math.round(s.done/s.total*100):0;return s},[panelTasks,now]);
-const urgent=useMemo(()=>panelTasks.filter(t=>{const s=getS(t,now).l;return s==="Просрочено"||s==="Горит"}),[panelTasks,now]);
+const stats=useMemo(()=>{const s={total:0,done:0,active:0,burn:0,over:0};panelTasks.forEach(t=>{if(!t.name)return;s.total++;const st=taskState(t,now);if(st==="done")s.done++;else if(st==="in_progress")s.active++;else if(st==="burning"){s.burn++;s.active++}else if(st==="overdue")s.over++;else s.active++});s.pct=s.total?Math.round(s.done/s.total*100):0;return s},[panelTasks,now]);
+const urgent=useMemo(()=>panelTasks.filter(t=>{const s=taskState(t,now);return s==="overdue"||s==="burning"}),[panelTasks,now]);
 
 /* Tasks list */
 const filtered=useMemo(()=>{
 let l=[...tasksOnly].filter(t=>t.name);
-if(filter==="active")l=l.filter(t=>getS(t,now).l!=="Выполнено");
-else if(filter==="completed")l=l.filter(t=>getS(t,now).l==="Выполнено");
+if(filter==="active")l=l.filter(t=>taskState(t,now)!=="done");
+else if(filter==="completed")l=l.filter(t=>taskState(t,now)==="done");
 if(sortBy==="deadline")l.sort((a,b)=>(a.deadline||"9999").localeCompare(b.deadline||"9999"));
 else if(sortBy==="priority"){const o={};data.priorities.forEach((p,i)=>o[p]=i);l.sort((a,b)=>(o[a.pri]??99)-(o[b.pri]??99)||(a.deadline||"9999").localeCompare(b.deadline||"9999"))}
 else if(sortBy==="category")l.sort((a,b)=>(a.cat||"").localeCompare(b.cat||"")||(a.deadline||"9999").localeCompare(b.deadline||"9999"));
@@ -724,7 +737,7 @@ return l
 
 /* Today */
 const todayL=useMemo(()=>{
-let l=tasksOnly.filter(t=>{if(!t.name)return false;const st=getS(t,now);if(st.l==="Выполнено")return false;if(!t.start||t.start>now)return false;if(st.l==="Просрочено")return true;if(!t.deadline||t.deadline>=now)return true;return false});
+let l=tasksOnly.filter(t=>{if(!t.name)return false;const st=taskState(t,now);if(st==="done")return false;if(!t.start||t.start>now)return false;if(st==="overdue")return true;if(!t.deadline||t.deadline>=now)return true;return false});
 if(todaySort==="priority"){const o={};data.priorities.forEach((p,i)=>o[p]=i);l.sort((a,b)=>(o[a.pri]??99)-(o[b.pri]??99))}
 else if(todaySort==="deadline")l.sort((a,b)=>(a.deadline||"9999").localeCompare(b.deadline||"9999"));
 else if(todaySort==="category")l.sort((a,b)=>(a.cat||"").localeCompare(b.cat||""));
@@ -758,22 +771,22 @@ const[expCats,setExpCats]=useState([]);const[expPris,setExpPris]=useState([]);co
 const[expIncMeetings,setExpIncMeetings]=useState(true);
 const[expPreview,setExpPreview]=useState(null);const[expGen,setExpGen]=useState(false);
 const toggleA=(a,s,v)=>s(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
-const statuses=["Выполнено","В работе","Горит","Просрочено","Новая"];
+const statuses=["done","in_progress","burning","overdue","new"];
 
-const expFiltered=useMemo(()=>tasksOnly.filter(t=>{if(!t.name)return false;if(t.start&&t.start>expTo)return false;if(t.deadline&&t.deadline<expFrom&&getS(t,now).l!=="Просрочено")return false;if(expCats.length&&!expCats.includes(t.cat))return false;if(expPris.length&&!expPris.includes(t.pri))return false;if(expStat.length&&!expStat.includes(getS(t,now).l))return false;return true}),[tasksOnly,expFrom,expTo,expCats,expPris,expStat,now]);
+const expFiltered=useMemo(()=>tasksOnly.filter(t=>{if(!t.name)return false;if(t.start&&t.start>expTo)return false;if(t.deadline&&t.deadline<expFrom&&taskState(t,now)!=="overdue")return false;if(expCats.length&&!expCats.includes(t.cat))return false;if(expPris.length&&!expPris.includes(t.pri))return false;if(expStat.length&&!expStat.includes(taskState(t,now)))return false;return true}),[tasksOnly,expFrom,expTo,expCats,expPris,expStat,now]);
 
-const expMeetings=useMemo(()=>meetings.filter(m=>{if(!m.name)return false;if(m.start&&m.start>expTo)return false;if(m.deadline&&m.deadline<expFrom)return false;if(m.start&&m.start<expFrom&&m.deadline&&m.deadline<expFrom)return false;return true}),[meetings,expFrom,expTo]);
+const expMeetings=useMemo(()=>meetings.filter(m=>{if(!m.name)return false;const eventDate=m.deadline||m.start||"";if(!eventDate)return false;if(eventDate<expFrom||eventDate>expTo)return false;if(eventDate>now)return false;return true}),[meetings,expFrom,expTo,now]);
 
-const expStats=useMemo(()=>{const s={total:expFiltered.length,done:0,active:0,overdue:0,burning:0};expFiltered.forEach(t=>{const st=getS(t,now);if(st.l==="Выполнено")s.done++;else if(st.l==="Просрочено")s.overdue++;else if(st.l==="Горит")s.burning++;else s.active++});s.pct=s.total?Math.round(s.done/s.total*100):0;s.avgProg=s.total?Math.round(expFiltered.reduce((a,t)=>a+(t.progress||0),0)/s.total):0;return s},[expFiltered,now]);
+const expStats=useMemo(()=>{const s={total:expFiltered.length,done:0,active:0,overdue:0,burning:0};expFiltered.forEach(t=>{const st=taskState(t,now);if(st==="done")s.done++;else if(st==="overdue")s.overdue++;else if(st==="burning")s.burning++;else s.active++});s.pct=s.total?Math.round(s.done/s.total*100):0;s.avgProg=s.total?Math.round(expFiltered.reduce((a,t)=>a+(t.progress||0),0)/s.total):0;return s},[expFiltered,now]);
 
 const genReport=()=>{setExpGen(true);setTimeout(()=>{
 const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const catBr={};expFiltered.forEach(t=>{catBr[t.cat||"—"]=(catBr[t.cat||"—"]||0)+1});
 const priBr={};expFiltered.forEach(t=>{priBr[t.pri]=(priBr[t.pri]||0)+1});
-const done=expFiltered.filter(t=>getS(t,now).l==="Выполнено");
-const overdue=expFiltered.filter(t=>getS(t,now).l==="Просрочено");
-const burning=expFiltered.filter(t=>getS(t,now).l==="Горит");
-const inprog=expFiltered.filter(t=>getS(t,now).l==="В работе");
+const done=expFiltered.filter(t=>taskState(t,now)==="done");
+const overdue=expFiltered.filter(t=>taskState(t,now)==="overdue");
+const burning=expFiltered.filter(t=>taskState(t,now)==="burning");
+const inprog=expFiltered.filter(t=>taskState(t,now)==="in_progress");
 const onTimeDone=done.filter(t=>!t.deadline||t.completedAt<=t.deadline).length;
 const onTimeRate=done.length?Math.round(onTimeDone/done.length*100):null;
 const avgTimeDays=(()=>{const ts=done.filter(t=>t.completedAt&&t.start);if(!ts.length)return null;return Math.round(ts.reduce((s,t)=>s+Math.max(0,diffD(t.completedAt,t.start)),0)/ts.length*10)/10})();
@@ -782,7 +795,7 @@ const taskRow=(t,showDeadline)=>{const st=getS(t,now);const cc=st.c==='var(--gre
 
 /* Meeting stats */
 const mtgDone=expMeetings.filter(m=>m.progress>=100);
-const mtgUpcoming=expMeetings.filter(m=>m.progress<100&&(!m.deadline||m.deadline>=now));
+const mtgPendingProtocol=expMeetings.filter(m=>!(m.meetingResult||"").trim());
 const mtgPast=expMeetings.filter(m=>m.progress<100&&m.deadline&&m.deadline<now);
 const mtgWithResult=expMeetings.filter(m=>m.meetingResult&&m.meetingResult.trim());
 
@@ -792,8 +805,8 @@ const mtgBlock=expIncMeetings&&expMeetings.length?`
 <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
 <div class="kpi-box cyan"><div class="num">${expMeetings.length}</div><div class="lbl">Всего</div></div>
 <div class="kpi-box grn"><div class="num">${mtgDone.length}</div><div class="lbl">Проведено</div></div>
-<div class="kpi-box blue"><div class="num">${mtgUpcoming.length}</div><div class="lbl">Предстоят</div></div>
-<div class="kpi-box pnk"><div class="num">${mtgWithResult.length}</div><div class="lbl">С результатом</div></div>
+<div class="kpi-box blue"><div class="num">${mtgWithResult.length}</div><div class="lbl">С результатом</div></div>
+<div class="kpi-box pnk"><div class="num">${mtgPendingProtocol.length}</div><div class="lbl">Без результата</div></div>
 </div>
 
 <table><thead><tr><th>Название</th><th>Дата</th><th>Время</th><th>Приоритет</th><th>Статус</th></tr></thead><tbody>
@@ -908,7 +921,10 @@ ${burning.length?`<div class="section"><h2 style="color:#F59E0B">🔥 Горящ
 
 ${inprog.length?`<div class="section"><h2 style="color:#4361EE">⟳ В работе <span class="count">${inprog.length}</span></h2><table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Дедлайн</th><th>Статус</th><th>Прогресс</th></tr></thead><tbody>${inprog.map(t=>taskRow(t,true)).join('')}</tbody></table></div>`:''}
 
-${done.length?`<div class="section page-break"><h2 style="color:#10B981">✓ Выполненные <span class="count">${done.length}</span></h2><table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Статус</th><th>Прогресс</th><th>Завершено</th></tr></thead><tbody>${done.map(t=>taskRow(t,false)).join('')}</tbody></table></div>`:''}
+${done.length?`<div class="section page-break"><h2 style="color:#10B981">✓ Выполненные <span class="count">${done.length}</span></h2><table><thead><tr><th>Задача</th><th>Категория</th><th>Приоритет</th><th>Статус</th><th>Прогресс</th><th>Завершено</th></tr></thead><tbody>${done.map(t=>taskRow(t,false)).join('')}</tbody></table>
+<h3 style="font-size:14px;font-weight:700;margin-top:20px;margin-bottom:10px;color:#10B981">🧾 Результаты завершённых задач</h3>
+${done.sort((a,b)=>(b.completedAt||"").localeCompare(a.completedAt||"")).map(t=>`<div style="background:#F0FDF4;border-left:4px solid #10B981;border-radius:10px;padding:14px;margin-bottom:10px"><div style="font-weight:700;font-size:14px;margin-bottom:4px">${esc(t.name)}</div><div style="font-size:11px;color:#64748B;margin-bottom:8px">${fmt(t.completedAt)} · ${esc(t.pri)} ${t.cat?`· ${esc(t.cat)}`:""}</div><div style="font-size:13px;line-height:1.55;color:#1E293B;white-space:pre-wrap">${esc((t.taskResult||"").trim()||"Результат не указан")}</div></div>`).join('')}
+</div>`:''}
 
 ${mtgBlock}
 
@@ -931,7 +947,7 @@ return<button className="add-b" onClick={()=>{setEditTask(null);setShowForm(true
 
 return<div>
 {/* Notification overlay */}
-{notifications.length>0&&<div style={{position:"fixed",top:12,right:12,zIndex:3000,display:"flex",flexDirection:"column",gap:8,maxWidth:400}}>
+{notifications.length>0&&<div style={{position:"fixed",bottom:12,right:12,zIndex:3000,display:"flex",flexDirection:"column",gap:8,maxWidth:400}}>
 {notifications.map((n,i)=><div key={i} style={{background:n.type==="meeting_start"?"var(--cyan-bg)":"var(--red-bg)",border:`1px solid ${n.type==="meeting_start"?"var(--cyan)":"var(--red)"}`,borderRadius:14,padding:"14px 18px",boxShadow:"var(--shadow-lg)",animation:"su .3s ease"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
 <div>
@@ -998,16 +1014,17 @@ return<div className="hdr"><div className="hdr-brand">
 <span style={{fontSize:12,color:"var(--text4)",marginLeft:"auto"}}>{filtered.length} задач</span>
 </div>
 <div style={{display:"flex",flexDirection:"column",gap:6}}>{filtered.map(t=>{const st=getS(t,now);const dl=t.deadline?diffD(t.deadline,now):null;
-return<div key={t.id} className={`tr ${st.l==="Выполнено"?"done":""}`} onClick={()=>setDetailTask(t)}>
+return<div key={t.id} className={`tr ${st.code==="done"?"done":""}`} onClick={()=>setDetailTask(t)}>
 <div className="task-left" style={{background:gp(t.pri)}}/>
 <div style={{flex:1,minWidth:0}}>
-<div style={{fontWeight:600,fontSize:14,textDecoration:st.l==="Выполнено"?"line-through":"none",color:st.l==="Выполнено"?"var(--text3)":"var(--text)"}}>{t.name}</div>
+<div style={{fontWeight:600,fontSize:14,textDecoration:st.code==="done"?"line-through":"none",color:st.code==="done"?"var(--text3)":"var(--text)"}}>{t.name}</div>
 <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
 <Bdg color={gc(t.cat)}>{t.cat}</Bdg><Bdg color={gp(t.pri)} bg={gb(t.pri)}>{t.pri}</Bdg>
 {t.deadline&&<span style={{fontSize:11,color:dl<0?"var(--red)":dl<=2?"var(--amber)":"var(--text3)"}}>📅 {fmt(t.deadline)}{dl!==null&&dl<0?` (+${Math.abs(dl)}д)`:""}</span>}
 {t.completedAt&&<span style={{fontSize:11,color:"var(--green)"}}>✓ {fmt(t.completedAt)}</span>}
 {t.recurringId&&<span style={{fontSize:10,color:"var(--text4)"}}>🔁</span>}
 </div>
+{t.taskResult&&<div style={{fontSize:11,color:"var(--text2)",marginTop:6,padding:"6px 10px",background:"var(--bg)",borderRadius:8,borderLeft:"3px solid var(--green)"}}>🧾 {t.taskResult.slice(0,90)}{t.taskResult.length>90?"...":""}</div>}
 <div style={{marginTop:6}} onClick={e=>e.stopPropagation()}><PBar value={t.progress} color={st.c} onChange={p=>setProg(t.id,p)}/></div>
 </div>
 <div style={{textAlign:"right",flexShrink:0}}><Bdg color={st.c}>{st.i} {st.l}</Bdg><div style={{fontSize:14,fontWeight:700,color:st.c,fontFamily:"var(--mono)",marginTop:4}}>{t.progress}%</div></div>
@@ -1147,7 +1164,7 @@ return completed.map((t,i)=><tr key={t.id||i} style={{background:i%2===0?"#FFFFF
 {/* ═══ АНАЛИТИКА ═══ */}
 {tab==="analytics"&&(()=>{
 const anFiltered=tasksOnly.filter(t=>{if(!t.name)return false;if(anCat&&t.cat!==anCat)return false;if(anPri&&t.pri!==anPri)return false;const[f,to]=periodRange(anPeriod);return inPeriod(t,f,to)});
-const anS={total:0,done:0,active:0,burn:0,over:0};anFiltered.forEach(t=>{anS.total++;const st=getS(t,now).l;if(st==="Выполнено")anS.done++;else if(st==="Просрочено")anS.over++;else if(st==="Горит")anS.burn++;else if(st==="В работе")anS.active++;});
+const anS={total:0,done:0,active:0,burn:0,over:0};anFiltered.forEach(t=>{anS.total++;const st=taskState(t,now);if(st==="done")anS.done++;else if(st==="overdue")anS.over++;else if(st==="burning")anS.burn++;else if(st==="in_progress")anS.active++;});
 const anPct=anS.total?Math.round(anS.done/anS.total*100):0;const anAvg=anS.total?Math.round(anFiltered.reduce((a,t)=>a+(t.progress||0),0)/anS.total):0;
 const segs=[{label:"Выполнено",value:anS.done,color:"#10B981"},{label:"В работе",value:anS.active,color:"#4361EE"},{label:"Горит",value:anS.burn,color:"#F59E0B"},{label:"Просрочено",value:anS.over,color:"#EF4444"}].filter(s=>s.value>0).map(s=>({...s,pct:anS.total?s.value/anS.total*100:0}));
 return<div>
@@ -1182,6 +1199,21 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 <div className="stat-row"><span style={{color:"var(--text2)"}}>Горит + Просрочено</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--red)"}}>{anS.burn+anS.over}</span></div>
 <div className="stat-row"><span style={{color:"var(--text2)"}}>Коэф. завершения</span><span style={{fontWeight:700,fontFamily:"var(--mono)",color:"var(--accent)"}}>{anPct}%</span></div>
 </div>
+</div>
+<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginTop:16}} className="three-col">
+<div className="chart-card"><div className="chart-title" style={{fontWeight:700,marginBottom:14}}>📅 Нагрузка по дням недели</div>
+{(()=>{const wd=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];const d=Array(7).fill(0);anFiltered.forEach(t=>{if(!t.deadline)return;const n=(new Date(t.deadline).getDay()+6)%7;d[n]++});const mx=Math.max(...d,1);
+return<div>{wd.map((n,i)=><div key={n} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><div style={{width:24,fontSize:11,color:"var(--text3)"}}>{n}</div><div style={{flex:1,height:9,background:"var(--bg4)",borderRadius:8,overflow:"hidden"}}><div style={{height:"100%",width:`${(d[i]/mx)*100}%`,background:"var(--gradient2)"}}/></div><div style={{width:24,textAlign:"right",fontFamily:"var(--mono)",fontSize:11,fontWeight:700}}>{d[i]}</div></div>)}</div>})()}
+</div>
+<div className="chart-card"><div className="chart-title" style={{fontWeight:700,marginBottom:14}}>🏁 Топ завершённых с результатом</div>
+{(()=>{const top=anFiltered.filter(t=>t.completedAt).sort((a,b)=>(b.completedAt||"").localeCompare(a.completedAt||"")).slice(0,5);
+return top.length?top.map(t=><div key={t.id} style={{padding:"9px 0",borderBottom:"1px solid var(--border)"}}><div style={{fontWeight:700,fontSize:12}}>{t.name}</div><div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{fmt(t.completedAt)} · {t.taskResult?"есть результат":"без результата"}</div></div>):<div style={{textAlign:"center",padding:24,color:"var(--text4)"}}>Нет данных</div>})()}
+</div>
+<div className="chart-card"><div className="chart-title" style={{fontWeight:700,marginBottom:14}}>🧭 Контроль дедлайнов</div>
+{(()=>{const total=anFiltered.length||1;const onTrack=anFiltered.filter(t=>["new","in_progress","done"].includes(taskState(t,now))).length;const risk=anFiltered.filter(t=>taskState(t,now)==="burning").length;const failed=anFiltered.filter(t=>taskState(t,now)==="overdue").length;
+return<div><div className="stat-row"><span style={{color:"var(--text2)"}}>В норме</span><span style={{fontFamily:"var(--mono)",fontWeight:700,color:"var(--green)"}}>{onTrack} ({Math.round(onTrack/total*100)}%)</span></div><div className="stat-row"><span style={{color:"var(--text2)"}}>Риск</span><span style={{fontFamily:"var(--mono)",fontWeight:700,color:"var(--amber)"}}>{risk}</span></div><div className="stat-row"><span style={{color:"var(--text2)"}}>Срыв срока</span><span style={{fontFamily:"var(--mono)",fontWeight:700,color:"var(--red)"}}>{failed}</span></div></div>})()}
+</div>
+</div>
 </div></div>})()}
 
 {/* ═══ ЭКСПОРТ ═══ */}
@@ -1198,7 +1230,7 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 <div style={{marginBottom:16}}><label style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".6px",marginBottom:6,display:"block"}}>Приоритеты</label>
 <div style={{display:"flex",flexWrap:"wrap",gap:4}}>{data.priorities.map(p=><button key={p} onClick={()=>toggleA(expPris,setExpPris,p)} style={{padding:"4px 10px",borderRadius:8,border:`1px solid ${expPris.includes(p)?gp(p):"var(--border)"}`,background:expPris.includes(p)?gp(p)+"15":"#fff",color:expPris.includes(p)?gp(p):"var(--text3)",fontSize:11,fontWeight:600,cursor:"pointer"}}>{p}</button>)}</div></div>
 <div style={{marginBottom:20}}><label style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".6px",marginBottom:6,display:"block"}}>Статусы</label>
-<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{statuses.map(s=><button key={s} onClick={()=>toggleA(expStat,setExpStat,s)} style={{padding:"4px 10px",borderRadius:8,border:`1px solid ${expStat.includes(s)?"var(--accent)":"var(--border)"}`,background:expStat.includes(s)?"var(--accent-bg)":"#fff",color:expStat.includes(s)?"var(--accent)":"var(--text3)",fontSize:11,fontWeight:600,cursor:"pointer"}}>{s}</button>)}</div></div>
+<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{statuses.map(s=><button key={s} onClick={()=>toggleA(expStat,setExpStat,s)} style={{padding:"4px 10px",borderRadius:8,border:`1px solid ${expStat.includes(s)?"var(--accent)":"var(--border)"}`,background:expStat.includes(s)?"var(--accent-bg)":"#fff",color:expStat.includes(s)?"var(--accent)":"var(--text3)",fontSize:11,fontWeight:600,cursor:"pointer"}}>{stateLabel(s)}</button>)}</div></div>
 <div style={{marginBottom:16}}><label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}><input type="checkbox" checked={expIncMeetings} onChange={e=>setExpIncMeetings(e.target.checked)} style={{width:18,height:18,accentColor:"var(--cyan2)"}}/> Включить совещания в отчёт</label></div>
 <div style={{background:"var(--bg)",borderRadius:10,padding:12,marginBottom:16}}>
 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"var(--text3)"}}>Задач:</span><span style={{fontWeight:700,fontFamily:"var(--mono)"}}>{expFiltered.length}</span></div>
@@ -1219,7 +1251,7 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 {showForm&&<TForm onClose={()=>{setShowForm(false);setEditTask(null)}} initial={editTask} cats={data.categories} pris={data.priorities} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
 {showMForm&&<MForm onClose={()=>{setShowMForm(false);setEditTask(null)}} initial={editTask} pris={data.priorities} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
 {showRForm&&<RForm onClose={()=>{setShowRForm(false);setEditRec(null)}} initial={editRec} cats={data.categories} pris={data.priorities} onSubmit={async r=>{if(editRec){await callApi("update_recurring",editRec.id,JSON.stringify(r))}else{await callApi("add_recurring",JSON.stringify(r))}reload()}}/>}
-{detailTask&&<TDetail task={data.tasks.find(x=>x.id===detailTask.id)||detailTask} onClose={()=>setDetailTask(null)} now={now} onEdit={t=>{setDetailTask(null);setEditTask(t);if(t.type==="meeting")setShowMForm(true);else setShowForm(true)}} onDelete={delT} onProg={setProg} onSaveResult={async(id,text)=>{await callApi("update_task",id,JSON.stringify({meetingResult:text}));reload()}}/>}
+{detailTask&&<TDetail task={data.tasks.find(x=>x.id===detailTask.id)||detailTask} onClose={()=>setDetailTask(null)} now={now} onEdit={t=>{setDetailTask(null);setEditTask(t);if(t.type==="meeting")setShowMForm(true);else setShowForm(true)}} onDelete={delT} onProg={setProg} onSaveResult={(id,text,isTask)=>saveResult(id,text,isTask)}/>}
 {toast&&<Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)}/>}
 {drillKpi&&<KpiDrill kpi={drillKpi} tasks={panelTasks} now={now} onClose={()=>setDrillKpi(null)} onOpenTask={t=>setDetailTask(t)}/>}
 </div>}
