@@ -91,6 +91,13 @@ def init_db():
         )
     """)
 
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+
     # Migrations for older DBs
     cols = [r["name"] for r in c.execute("PRAGMA table_info(tasks)").fetchall()]
     migrations = [
@@ -208,7 +215,8 @@ def get_all_data():
             "createdAt": r["created_at"],
         })
     conn.close()
-    return {"categories": cats, "priorities": pris, "tasks": tasks, "recurring": recurring}
+    settings = get_settings()
+    return {"categories": cats, "priorities": pris, "tasks": tasks, "recurring": recurring, "settings": settings}
 
 
 def add_task(data):
@@ -362,12 +370,25 @@ def propagate_recurring_edit(rec_id, patch):
 def generate_recurring_tasks():
     """Generate instances for active recurring rules.
     - Meetings: created up to today+30 days (so they appear in the calendar ahead of time)
-    - Tasks: created only for today (appear on the day they are due)
+    - Tasks: by default created only for today (configurable via settings)
     """
     conn = get_conn()
     today = datetime.now().date()
-    meeting_horizon = today + timedelta(days=30)
+    # Read settings for horizons
+    settings = get_settings()
+    meeting_horizon_days = settings.get("cycles_meeting_horizon_days", 30)
+    task_ahead = settings.get("cycles_task_create_ahead", False)
+    task_horizon_days = settings.get("cycles_task_horizon_days", 30)
+    max_active = settings.get("cycles_max_active", 0)
+    auto_del_days = settings.get("cycles_auto_delete_old_days", 0)
+
+    meeting_horizon = today + timedelta(days=meeting_horizon_days)
     rules = conn.execute("SELECT * FROM recurring WHERE active=1").fetchall()
+
+    # Enforce max active cycles
+    if max_active > 0 and len(rules) > max_active:
+        rules = rules[:max_active]
+
     created = []
 
     for rule in rules:
@@ -392,13 +413,18 @@ def generate_recurring_tasks():
         is_meeting = (rule["kind"] == "meeting")
 
         if is_meeting:
-            # Meetings: generate up to 30 days ahead so they show in the weekly calendar
             horizon = meeting_horizon
             last_day = min(horizon, rule_end_raw) if rule_end_raw else horizon
         else:
-            # Tasks: only generate for today
-            horizon = today
-            last_day = min(today, rule_end_raw) if rule_end_raw else today
+            if task_ahead:
+                # User chose to create tasks ahead of time too
+                task_horizon = today + timedelta(days=task_horizon_days)
+                horizon = task_horizon
+                last_day = min(task_horizon, rule_end_raw) if rule_end_raw else task_horizon
+            else:
+                # Default: tasks only for today
+                horizon = today
+                last_day = min(today, rule_end_raw) if rule_end_raw else today
 
         day = max(rule_start, today)
         dd = rule["deadline_days"] or 0
@@ -430,6 +456,14 @@ def generate_recurring_tasks():
         conn.execute("UPDATE recurring SET last_generated=? WHERE id=?",
                      (last_day.strftime("%Y-%m-%d"), rule["id"]))
 
+    # Auto-delete old completed recurring instances
+    if auto_del_days > 0:
+        cutoff = (today - timedelta(days=auto_del_days)).strftime("%Y-%m-%d")
+        conn.execute("""
+            DELETE FROM tasks WHERE recurring_id IS NOT NULL
+            AND progress >= 100 AND completed_at IS NOT NULL AND completed_at < ?
+        """, (cutoff,))
+
     conn.commit()
     conn.close()
     return created
@@ -439,12 +473,17 @@ def generate_recurring_tasks():
 
 def get_pending_notifications():
     """Returns list of new notifications to show and marks them as notified."""
+    settings = get_settings()
+    if not settings.get("notifications_enabled", True):
+        return []
+
     conn = get_conn()
     now = datetime.now()
     today_iso = now.strftime("%Y-%m-%d")
     notifications = []
+    minutes_before = settings.get("notifications_meeting_minutes_before", 5)
 
-    # Meetings starting within 5 minutes
+    # Meetings starting within N minutes
     meetings = conn.execute("""
         SELECT * FROM tasks
         WHERE type='meeting' AND notified_start=0 AND (progress IS NULL OR progress < 100)
@@ -455,7 +494,7 @@ def get_pending_notifications():
             sh, sm = map(int, m["time_start"].split(":"))
             start_dt = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
             delta = (start_dt - now).total_seconds()
-            if -60 <= delta <= 300:
+            if -60 <= delta <= (minutes_before * 60):
                 notifications.append({
                     "type": "meeting_start",
                     "id": m["id"],
@@ -468,20 +507,21 @@ def get_pending_notifications():
         except (ValueError, AttributeError):
             pass
 
-    # Tasks: just became overdue
-    overdue = conn.execute("""
-        SELECT * FROM tasks
-        WHERE type='task' AND notified_overdue=0 AND (progress IS NULL OR progress < 100)
-          AND deadline IS NOT NULL AND deadline != '' AND deadline < ?
-    """, (today_iso,)).fetchall()
-    for t in overdue:
-        notifications.append({
-            "type": "overdue",
-            "id": t["id"],
-            "name": t["name"],
-            "deadline": t["deadline"],
-        })
-        conn.execute("UPDATE tasks SET notified_overdue=1 WHERE id=?", (t["id"],))
+    # Tasks: just became overdue (if enabled)
+    if settings.get("notifications_overdue_enabled", True):
+        overdue = conn.execute("""
+            SELECT * FROM tasks
+            WHERE type='task' AND notified_overdue=0 AND (progress IS NULL OR progress < 100)
+              AND deadline IS NOT NULL AND deadline != '' AND deadline < ?
+        """, (today_iso,)).fetchall()
+        for t in overdue:
+            notifications.append({
+                "type": "overdue",
+                "id": t["id"],
+                "name": t["name"],
+                "deadline": t["deadline"],
+            })
+            conn.execute("UPDATE tasks SET notified_overdue=1 WHERE id=?", (t["id"],))
 
     conn.commit()
     conn.close()
@@ -529,3 +569,134 @@ def delete_priority(name):
     conn.commit()
     conn.close()
     return True
+
+
+# ─── SETTINGS ──────────────────────────────────────────────────
+
+import json as _json
+
+DEFAULT_SETTINGS = {
+    # ── Language ──
+    "lang": "ru",  # "ru" | "uk"
+
+    # ── Visible tabs ──
+    "tabs_visible": {
+        "panel": True,
+        "tasks": True,
+        "meetings": True,
+        "cycles": True,
+        "today": True,
+        "journal": True,
+        "analytics": True,
+        "export": True,
+        "settings": True,
+    },
+
+    # ── App branding ──
+    "app_name": "Smart Planner",
+    "logo_base64": "",  # user-uploaded PNG as data URL
+
+    # ── Panel ──
+    "panel_default_period": "all",
+    "panel_show_priorities": True,
+    "panel_show_categories": True,
+    "panel_show_urgent": True,
+    "panel_show_progress_bar": True,
+
+    # ── Tasks ──
+    "tasks_default_filter": "active",
+    "tasks_default_sort": "deadline",
+    "tasks_show_completed_date": True,
+    "tasks_show_recurring_badge": True,
+
+    # ── Meetings ──
+    "meetings_show_calendar": True,
+    "meetings_default_filter": "upcoming",
+    "meetings_default_sort": "date",
+    "meetings_show_result_preview": True,
+
+    # ── Today ──
+    "today_default_sort": "priority",
+    "today_show_meetings": True,
+    "today_show_tasks": True,
+
+    # ── Journal ──
+    "journal_show_description": False,
+
+    # ── Analytics ──
+    "analytics_default_period": "all",
+    "analytics_show_status_chart": True,
+    "analytics_show_category_chart": True,
+    "analytics_show_priority_chart": True,
+    "analytics_show_productivity": True,
+    "analytics_show_timeline": True,
+    "analytics_show_heatmap": True,
+    "analytics_show_upcoming": True,
+
+    # ── Export ──
+    "export_include_meetings": True,
+    "export_default_period_days": 30,
+
+    # ── Notifications ──
+    "notifications_enabled": True,
+    "notifications_meeting_minutes_before": 5,
+    "notifications_overdue_enabled": True,
+
+    # ── Recurring / Cycles ──
+    "cycles_meeting_horizon_days": 30,
+    "cycles_task_create_ahead": False,  # False = only today, True = ahead like meetings
+    "cycles_task_horizon_days": 30,     # used only if create_ahead is True
+    "cycles_max_active": 0,            # 0 = unlimited
+    "cycles_auto_delete_old_days": 0,  # 0 = never, >0 = delete completed older than N days
+
+    # ── Display ──
+    "display_compact_mode": False,
+    "display_animations": True,
+}
+
+
+def get_settings():
+    """Return merged settings: defaults + user overrides from DB."""
+    conn = get_conn()
+    rows = conn.execute("SELECT key, value FROM settings").fetchall()
+    conn.close()
+    result = _json.loads(_json.dumps(DEFAULT_SETTINGS))  # deep copy
+    for row in rows:
+        try:
+            val = _json.loads(row["value"])
+        except (_json.JSONDecodeError, TypeError):
+            val = row["value"]
+        # Handle nested dicts
+        if isinstance(val, dict) and isinstance(result.get(row["key"]), dict):
+            result[row["key"]].update(val)
+        else:
+            result[row["key"]] = val
+    return result
+
+
+def save_setting(key, value):
+    """Save a single setting key."""
+    conn = get_conn()
+    val_str = _json.dumps(value, ensure_ascii=False)
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, val_str))
+    conn.commit()
+    conn.close()
+
+
+def save_settings_bulk(settings_dict):
+    """Save multiple settings at once."""
+    conn = get_conn()
+    for key, value in settings_dict.items():
+        val_str = _json.dumps(value, ensure_ascii=False)
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, val_str))
+    conn.commit()
+    conn.close()
+
+
+def reset_settings():
+    """Reset all settings to defaults."""
+    conn = get_conn()
+    conn.execute("DELETE FROM settings")
+    conn.commit()
+    conn.close()
+

@@ -176,8 +176,66 @@ const td=()=>new Date().toISOString().split("T")[0];
 const fmt=d=>{if(!d)return"\u2014";const t=new Date(d);return`${String(t.getDate()).padStart(2,"0")}.${String(t.getMonth()+1).padStart(2,"0")}.${t.getFullYear()}`};
 const fmtS=d=>{if(!d)return"";const t=new Date(d);return`${String(t.getDate()).padStart(2,"0")}.${String(t.getMonth()+1).padStart(2,"0")}`};
 const diffD=(a,b)=>Math.round((new Date(a)-new Date(b))/864e5);
-const TABS=["Панель","Задачи","Совещания","Циклы","Сегодня","Журнал","Аналитика","Экспорт"];
-const TAB_ICONS={"Панель":"\ud83d\udcca","Задачи":"\ud83d\udccb","Совещания":"\ud83d\udd52","Циклы":"\ud83d\udd01","Сегодня":"\u2600\ufe0f","Журнал":"\ud83d\udcd3","Аналитика":"\ud83d\udcc8","Экспорт":"\ud83d\udcc4"};
+/* ═══ i18n ═══ */
+const I18N={
+ru:{
+panel:"Панель",tasks:"Задачи",meetings:"Совещания",cycles:"Циклы",today:"Сегодня",journal:"Журнал",analytics:"Аналитика",export:"Экспорт",settings:"Настройки",
+total:"Всего",done:"Выполнено",active:"В работе",burning:"Горит",overdue:"Просрочено",new_task:"Новая",progress:"Прогресс",deadline:"Дедлайн",priority:"Приоритет",category:"Категория",created:"Создано",completed:"Завершено",
+add_task:"+ Задача",add_meeting:"+ Совещание",add_cycle:"+ Цикл",
+name:"Название",description:"Описание",notes:"Заметки",save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Редактировать",finish:"Завершить",
+by_deadline:"По дедлайну",by_priority:"По приоритету",by_category:"По категории",by_created:"По дате создания",by_completed:"По дате завершения",
+all_time:"Всё время",today_period:"Сегодня",week:"Неделя",month:"Месяц",quarter:"Квартал",year:"Год",
+active_filter:"Активные",all_filter:"Все",done_filter:"Готовые",
+upcoming:"Предстоящие",past:"Прошедшие",
+settings_title:"Настройки",lang_label:"Язык интерфейса",tabs_label:"Видимые вкладки",branding_label:"Брендинг",upload_icon:"Загрузить иконку",app_name_label:"Название приложения",
+panel_settings:"Панель",tasks_settings:"Задачи",meetings_settings:"Совещания",today_settings:"Сегодня",journal_settings:"Журнал",analytics_settings:"Аналитика",export_settings:"Экспорт",
+notifications_label:"Уведомления",notifications_enabled:"Уведомления включены",meeting_minutes:"Мин. до совещания",overdue_notif:"Уведомления о просрочке",
+cycles_settings:"Циклы",meeting_horizon:"Горизонт совещаний (дней)",task_ahead:"Создавать задачи заранее",task_horizon:"Горизонт задач (дней)",max_cycles:"Макс. активных циклов (0=∞)",auto_delete:"Авто-удаление старых (дней, 0=нет)",
+display_label:"Отображение",compact_mode:"Компактный режим",animations:"Анимации",
+reset_all:"Сбросить все настройки",reset_confirm:"Сбросить настройки к значениям по умолчанию?",
+categories_label:"Категории",priorities_label:"Приоритеты",
+default_period:"Период по умолчанию",default_filter:"Фильтр по умолчанию",default_sort:"Сортировка по умолчанию",
+show_calendar:"Показывать календарь",show_result_preview:"Показывать превью результатов",
+show_priorities:"Показывать приоритеты",show_categories:"Показывать категории",show_urgent:"Показывать срочные",show_progress:"Показывать прогресс",
+show_meetings_today:"Показывать совещания",show_tasks_today:"Показывать задачи",
+include_meetings_export:"Включать совещания в отчёт",
+no_tasks:"Нет задач",no_meetings:"Нет совещаний",all_done:"Всё выполнено!",
+report_title:"Экспорт отчёта",generate_report:"Сформировать отчёт",print_pdf:"Печать / PDF",preview:"Предпросмотр",
+meeting_result_label:"Результаты совещания",save_result:"Сохранить результат",
+},
+uk:{
+panel:"Панель",tasks:"Завдання",meetings:"Наради",cycles:"Цикли",today:"Сьогодні",journal:"Журнал",analytics:"Аналітика",export:"Експорт",settings:"Налаштування",
+total:"Всього",done:"Виконано",active:"В роботі",burning:"Горить",overdue:"Прострочено",new_task:"Нова",progress:"Прогрес",deadline:"Дедлайн",priority:"Пріоритет",category:"Категорія",created:"Створено",completed:"Завершено",
+add_task:"+ Завдання",add_meeting:"+ Нарада",add_cycle:"+ Цикл",
+name:"Назва",description:"Опис",notes:"Нотатки",save:"Зберегти",cancel:"Скасувати",delete:"Видалити",edit:"Редагувати",finish:"Завершити",
+by_deadline:"За дедлайном",by_priority:"За пріоритетом",by_category:"За категорією",by_created:"За датою створення",by_completed:"За датою завершення",
+all_time:"Весь час",today_period:"Сьогодні",week:"Тиждень",month:"Місяць",quarter:"Квартал",year:"Рік",
+active_filter:"Активні",all_filter:"Всі",done_filter:"Готові",
+upcoming:"Майбутні",past:"Минулі",
+settings_title:"Налаштування",lang_label:"Мова інтерфейсу",tabs_label:"Видимі вкладки",branding_label:"Брендинг",upload_icon:"Завантажити іконку",app_name_label:"Назва додатку",
+panel_settings:"Панель",tasks_settings:"Завдання",meetings_settings:"Наради",today_settings:"Сьогодні",journal_settings:"Журнал",analytics_settings:"Аналітика",export_settings:"Експорт",
+notifications_label:"Сповіщення",notifications_enabled:"Сповіщення увімкнені",meeting_minutes:"Хв. до наради",overdue_notif:"Сповіщення про прострочення",
+cycles_settings:"Цикли",meeting_horizon:"Горизонт нарад (днів)",task_ahead:"Створювати завдання заздалегідь",task_horizon:"Горизонт завдань (днів)",max_cycles:"Макс. активних циклів (0=∞)",auto_delete:"Авто-видалення старих (днів, 0=ні)",
+display_label:"Відображення",compact_mode:"Компактний режим",animations:"Анімації",
+reset_all:"Скинути всі налаштування",reset_confirm:"Скинути налаштування до значень за замовчуванням?",
+categories_label:"Категорії",priorities_label:"Пріоритети",
+default_period:"Період за замовчуванням",default_filter:"Фільтр за замовчуванням",default_sort:"Сортування за замовчуванням",
+show_calendar:"Показувати календар",show_result_preview:"Показувати прев'ю результатів",
+show_priorities:"Показувати пріоритети",show_categories:"Показувати категорії",show_urgent:"Показувати термінові",show_progress:"Показувати прогрес",
+show_meetings_today:"Показувати наради",show_tasks_today:"Показувати завдання",
+include_meetings_export:"Включати наради у звіт",
+no_tasks:"Немає завдань",no_meetings:"Немає нарад",all_done:"Все виконано!",
+report_title:"Експорт звіту",generate_report:"Сформувати звіт",print_pdf:"Друк / PDF",preview:"Попередній перегляд",
+meeting_result_label:"Результати наради",save_result:"Зберегти результат",
+}
+};
+
+const TAB_KEYS=["panel","tasks","meetings","cycles","today","journal","analytics","export","settings"];
+const TAB_ICONS_MAP={panel:"\ud83d\udcca",tasks:"\ud83d\udccb",meetings:"\ud83d\udd52",cycles:"\ud83d\udd01",today:"\u2600\ufe0f",journal:"\ud83d\udcd3",analytics:"\ud83d\udcc8",export:"\ud83d\udcc4",settings:"\u2699\ufe0f"};
+
+/* Legacy compat: components still reference these */
+const TABS=["Панель","Задачи","Совещания","Циклы","Сегодня","Журнал","Аналитика","Экспорт","Настройки"];
+const TAB_ICONS={"Панель":"\ud83d\udcca","Задачи":"\ud83d\udccb","Совещания":"\ud83d\udd52","Циклы":"\ud83d\udd01","Сегодня":"\u2600\ufe0f","Журнал":"\ud83d\udcd3","Аналитика":"\ud83d\udcc8","Экспорт":"\ud83d\udcc4","Настройки":"\u2699\ufe0f"};
 const dayN=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 const dayFull=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье"];
 const hours=Array.from({length:15},(_,i)=>`${String(i+7).padStart(2,"0")}:00`);
@@ -420,11 +478,175 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 }
 
 
+/* ═══ SETTINGS PAGE ═══ */
+function SettingsPage({settings,onSave,onReset,showToast,data,onUpdate,lang}){
+const t=I18N[lang]||I18N.ru;
+const[s,setS]=useState(JSON.parse(JSON.stringify(settings)));
+const[dirty,setDirty]=useState(false);
+const set=(k,v)=>{setS(p=>{const n={...p,[k]:v};return n});setDirty(true)};
+const setNested=(group,k,v)=>{setS(p=>{const n={...p,[group]:{...p[group],[k]:v}};return n});setDirty(true)};
+const doSave=async()=>{await onSave(s);setDirty(false);showToast(lang==="uk"?"Збережено!":"Сохранено!")};
+const doReset=async()=>{if(!confirm(t.reset_confirm))return;await onReset();setDirty(false)};
+const uploadIcon=()=>{const inp=document.createElement("input");inp.type="file";inp.accept=".png,.jpg,.jpeg,.svg";
+inp.onchange=e=>{const f=e.target.files[0];if(!f)return;if(f.size>2*1024*1024){showToast("Макс. 2MB","error");return}
+const r=new FileReader();r.onload=ev=>{set("logo_base64",ev.target.result);callApi("upload_icon",ev.target.result)};r.readAsDataURL(f)};inp.click()};
+
+const[nc,setNc]=useState("");const[np,setNp]=useState("");
+const doAddCat=async()=>{if(!nc.trim())return;if(nc.trim()==="Совещание"){showToast("Зарезервировано","error");return}await callApi("add_category",nc.trim());setNc("");onUpdate()};
+const doDelCat=async c=>{await callApi("delete_category",c);onUpdate()};
+const doAddPri=async()=>{if(!np.trim())return;await callApi("add_priority",np.trim());setNp("");onUpdate()};
+const doDelPri=async p=>{await callApi("delete_priority",p);onUpdate()};
+
+const Section=({title,icon,children})=><div className="card" style={{marginBottom:16}}>
+<div className="stitle"><span className="stitle-icon">{icon}</span> {title}</div>{children}</div>;
+
+const Toggle=({label,checked,onChange})=><label style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid var(--border)",cursor:"pointer",fontSize:13}}>
+<span>{label}</span>
+<div style={{width:40,height:22,borderRadius:11,background:checked?"var(--accent)":"var(--border2)",position:"relative",transition:"all .2s",flexShrink:0}} onClick={e=>{e.preventDefault();onChange(!checked)}}>
+<div style={{position:"absolute",top:2,left:checked?20:2,width:18,height:18,borderRadius:9,background:"#fff",transition:"all .2s",boxShadow:"0 1px 3px rgba(0,0,0,.15)"}}/>
+</div></label>;
+
+const SelectRow=({label,value,onChange,options})=><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid var(--border)",fontSize:13}}>
+<span>{label}</span>
+<select value={value} onChange={e=>onChange(e.target.value)} style={{padding:"6px 10px",borderRadius:8,border:"1px solid var(--border)",fontSize:12,background:"#fff"}}>{options.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
+</div>;
+
+const NumRow=({label,value,onChange,min=0,max=365})=><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid var(--border)",fontSize:13}}>
+<span>{label}</span>
+<input type="number" value={value} onChange={e=>onChange(parseInt(e.target.value)||0)} min={min} max={max} style={{width:80,padding:"6px 10px",borderRadius:8,border:"1px solid var(--border)",fontSize:12,textAlign:"center"}}/>
+</div>;
+
+return<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+<div style={{fontSize:22,fontWeight:800}}>⚙️ {t.settings_title}</div>
+<div style={{display:"flex",gap:8}}>
+{dirty&&<button className="bp" onClick={doSave} style={{width:"auto",padding:"10px 24px"}}>💾 {t.save}</button>}
+<button className="bo" onClick={doReset} style={{color:"var(--red)"}}>{t.reset_all}</button>
+</div>
+</div>
+
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}} className="two-col">
+
+{/* Left column */}
+<div>
+<Section title={t.lang_label} icon="🌐">
+<SelectRow label={t.lang_label} value={s.lang} onChange={v=>set("lang",v)} options={[["ru","Русский"],["uk","Українська"]]}/>
+</Section>
+
+<Section title={t.branding_label} icon="🎨">
+<div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+{s.logo_base64?<img src={s.logo_base64} style={{width:48,height:48,borderRadius:12,objectFit:"cover",border:"1px solid var(--border)"}}/>
+:<div style={{width:48,height:48,borderRadius:12,background:"var(--gradient)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⚡</div>}
+<div><button className="bo" onClick={uploadIcon} style={{fontSize:12}}>{t.upload_icon} (PNG)</button>
+{s.logo_base64&&<button className="bo" onClick={()=>set("logo_base64","")} style={{fontSize:11,marginLeft:6,color:"var(--red)"}}>✕</button>}
+</div>
+</div>
+<div className="fl" style={{marginBottom:0}}><label>{t.app_name_label}</label>
+<input value={s.app_name} onChange={e=>set("app_name",e.target.value)} style={{fontSize:13}}/></div>
+</Section>
+
+<Section title={t.tabs_label} icon="📑">
+{TAB_KEYS.filter(k=>k!=="settings").map(k=><Toggle key={k} label={`${TAB_ICONS_MAP[k]} ${(I18N[s.lang]||I18N.ru)[k]||k}`} checked={s.tabs_visible?.[k]!==false} onChange={v=>setNested("tabs_visible",k,v)}/>)}
+</Section>
+
+<Section title={t.notifications_label} icon="🔔">
+<Toggle label={t.notifications_enabled} checked={s.notifications_enabled!==false} onChange={v=>set("notifications_enabled",v)}/>
+<NumRow label={t.meeting_minutes} value={s.notifications_meeting_minutes_before||5} onChange={v=>set("notifications_meeting_minutes_before",v)} min={1} max={60}/>
+<Toggle label={t.overdue_notif} checked={s.notifications_overdue_enabled!==false} onChange={v=>set("notifications_overdue_enabled",v)}/>
+</Section>
+
+<Section title={t.categories_label} icon="🏷️">
+<div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+{data.categories.map(c=><div key={c} className="chip"><span style={{width:8,height:8,borderRadius:4,background:gc(c)}}/>{c}<button onClick={()=>doDelCat(c)}>×</button></div>)}
+</div>
+<div style={{display:"flex",gap:8}}>
+<input value={nc} onChange={e=>setNc(e.target.value)} placeholder="..." style={{flex:1,padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:13,background:"var(--bg)"}} onKeyDown={e=>{if(e.key==="Enter")doAddCat()}}/>
+<button className="bo" onClick={doAddCat}>+</button>
+</div>
+</Section>
+
+<Section title={t.priorities_label} icon="🎯">
+<div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+{data.priorities.map(p=><div key={p} className="chip"><span style={{width:8,height:8,borderRadius:4,background:gp(p)}}/>{p}<button onClick={()=>doDelPri(p)}>×</button></div>)}
+</div>
+<div style={{display:"flex",gap:8}}>
+<input value={np} onChange={e=>setNp(e.target.value)} placeholder="..." style={{flex:1,padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:13,background:"var(--bg)"}} onKeyDown={e=>{if(e.key==="Enter")doAddPri()}}/>
+<button className="bo" onClick={doAddPri}>+</button>
+</div>
+</Section>
+</div>
+
+{/* Right column */}
+<div>
+<Section title={t.panel_settings} icon="📊">
+<SelectRow label={t.default_period} value={s.panel_default_period} onChange={v=>set("panel_default_period",v)} options={[["all",t.all_time],["today",t.today_period],["week",t.week],["month",t.month],["quarter",t.quarter],["year",t.year]]}/>
+<Toggle label={t.show_priorities} checked={s.panel_show_priorities!==false} onChange={v=>set("panel_show_priorities",v)}/>
+<Toggle label={t.show_categories} checked={s.panel_show_categories!==false} onChange={v=>set("panel_show_categories",v)}/>
+<Toggle label={t.show_urgent} checked={s.panel_show_urgent!==false} onChange={v=>set("panel_show_urgent",v)}/>
+<Toggle label={t.show_progress} checked={s.panel_show_progress_bar!==false} onChange={v=>set("panel_show_progress_bar",v)}/>
+</Section>
+
+<Section title={t.tasks_settings} icon="📋">
+<SelectRow label={t.default_filter} value={s.tasks_default_filter} onChange={v=>set("tasks_default_filter",v)} options={[["active",t.active_filter],["all",t.all_filter],["completed",t.done_filter]]}/>
+<SelectRow label={t.default_sort} value={s.tasks_default_sort} onChange={v=>set("tasks_default_sort",v)} options={[["deadline",t.by_deadline],["priority",t.by_priority],["category",t.by_category],["created",t.by_created]]}/>
+<Toggle label="Показывать дату завершения" checked={s.tasks_show_completed_date!==false} onChange={v=>set("tasks_show_completed_date",v)}/>
+<Toggle label="Показывать значок 🔁" checked={s.tasks_show_recurring_badge!==false} onChange={v=>set("tasks_show_recurring_badge",v)}/>
+</Section>
+
+<Section title={t.meetings_settings} icon="🕐">
+<Toggle label={t.show_calendar} checked={s.meetings_show_calendar!==false} onChange={v=>set("meetings_show_calendar",v)}/>
+<SelectRow label={t.default_filter} value={s.meetings_default_filter} onChange={v=>set("meetings_default_filter",v)} options={[["upcoming",t.upcoming],["today",t.today_period],["past",t.past],["all",t.all_filter]]}/>
+<SelectRow label={t.default_sort} value={s.meetings_default_sort} onChange={v=>set("meetings_default_sort",v)} options={[["date","По дате ↑"],["date-desc","По дате ↓"],["priority",t.by_priority],["created",t.by_created]]}/>
+<Toggle label={t.show_result_preview} checked={s.meetings_show_result_preview!==false} onChange={v=>set("meetings_show_result_preview",v)}/>
+</Section>
+
+<Section title={t.today_settings} icon="☀️">
+<SelectRow label={t.default_sort} value={s.today_default_sort} onChange={v=>set("today_default_sort",v)} options={[["priority",t.by_priority],["deadline",t.by_deadline],["category",t.by_category],["created",t.by_created]]}/>
+<Toggle label={t.show_meetings_today} checked={s.today_show_meetings!==false} onChange={v=>set("today_show_meetings",v)}/>
+<Toggle label={t.show_tasks_today} checked={s.today_show_tasks!==false} onChange={v=>set("today_show_tasks",v)}/>
+</Section>
+
+<Section title={t.cycles_settings} icon="🔁">
+<NumRow label={t.meeting_horizon} value={s.cycles_meeting_horizon_days||30} onChange={v=>set("cycles_meeting_horizon_days",v)} min={7} max={365}/>
+<Toggle label={t.task_ahead} checked={!!s.cycles_task_create_ahead} onChange={v=>set("cycles_task_create_ahead",v)}/>
+{s.cycles_task_create_ahead&&<NumRow label={t.task_horizon} value={s.cycles_task_horizon_days||30} onChange={v=>set("cycles_task_horizon_days",v)} min={1} max={365}/>}
+<NumRow label={t.max_cycles} value={s.cycles_max_active||0} onChange={v=>set("cycles_max_active",v)} min={0} max={100}/>
+<NumRow label={t.auto_delete} value={s.cycles_auto_delete_old_days||0} onChange={v=>set("cycles_auto_delete_old_days",v)} min={0} max={365}/>
+</Section>
+
+<Section title={t.display_label} icon="🎨">
+<Toggle label={t.compact_mode} checked={!!s.display_compact_mode} onChange={v=>set("display_compact_mode",v)}/>
+<Toggle label={t.animations} checked={s.display_animations!==false} onChange={v=>set("display_animations",v)}/>
+</Section>
+
+<Section title={t.export_settings} icon="📄">
+<Toggle label={t.include_meetings_export} checked={s.export_include_meetings!==false} onChange={v=>set("export_include_meetings",v)}/>
+<NumRow label="Период по умолч. (дней)" value={s.export_default_period_days||30} onChange={v=>set("export_default_period_days",v)} min={7} max={365}/>
+</Section>
+
+<Section title={t.analytics_settings} icon="📈">
+<SelectRow label={t.default_period} value={s.analytics_default_period} onChange={v=>set("analytics_default_period",v)} options={[["all",t.all_time],["week",t.week],["month",t.month],["quarter",t.quarter],["year",t.year]]}/>
+<Toggle label="Статусы" checked={s.analytics_show_status_chart!==false} onChange={v=>set("analytics_show_status_chart",v)}/>
+<Toggle label="Категории" checked={s.analytics_show_category_chart!==false} onChange={v=>set("analytics_show_category_chart",v)}/>
+<Toggle label="Приоритеты" checked={s.analytics_show_priority_chart!==false} onChange={v=>set("analytics_show_priority_chart",v)}/>
+<Toggle label="Продуктивность" checked={s.analytics_show_productivity!==false} onChange={v=>set("analytics_show_productivity",v)}/>
+<Toggle label="Таймлайн" checked={s.analytics_show_timeline!==false} onChange={v=>set("analytics_show_timeline",v)}/>
+<Toggle label="Тепловая карта" checked={s.analytics_show_heatmap!==false} onChange={v=>set("analytics_show_heatmap",v)}/>
+<Toggle label="Ближайшие дедлайны" checked={s.analytics_show_upcoming!==false} onChange={v=>set("analytics_show_upcoming",v)}/>
+</Section>
+</div>
+</div>
+
+{dirty&&<div style={{position:"sticky",bottom:0,padding:"12px 0",background:"var(--bg)",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"flex-end",gap:8}}>
+<button className="bp" onClick={doSave} style={{width:"auto",padding:"10px 32px"}}>💾 {t.save}</button>
+</div>}
+</div>}
+
 /* ═══════════════ MAIN APP ═══════════════ */
 function App(){
 const[data,setData]=useState({categories:[],priorities:[],tasks:[],recurring:[]});
 const[loading,setLoading]=useState(true);
-const[tab,setTab]=useState("Панель");
+const[tab,setTab]=useState("panel");
 const now=td();
 const[showForm,setShowForm]=useState(false);
 const[showMForm,setShowMForm]=useState(false);
@@ -699,9 +921,11 @@ const printReport=async()=>{if(!expPreview)return;await callApi("save_pdf_report
 if(loading)return<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontSize:18,color:"var(--text3)"}}>Загрузка...</div>;
 
 const renderAddBtn=()=>{
-if(tab==="Совещания")return<button className="add-b add-m" onClick={()=>{setEditTask(null);setShowMForm(true)}}><span>+</span> Совещание</button>;
-if(tab==="Циклы")return<button className="add-b add-r" onClick={()=>{setEditRec(null);setShowRForm(true)}}><span>+</span> Цикл</button>;
-return<button className="add-b" onClick={()=>{setEditTask(null);setShowForm(true)}}><span>+</span> Задача</button>;
+const cfg=data.settings||{};const lang=cfg.lang||"ru";const tt=I18N[lang]||I18N.ru;
+if(tab==="meetings")return<button className="add-b add-m" onClick={()=>{setEditTask(null);setShowMForm(true)}}><span>+</span> {tt.meetings}</button>;
+if(tab==="cycles")return<button className="add-b add-r" onClick={()=>{setEditRec(null);setShowRForm(true)}}><span>+</span> {tt.cycles}</button>;
+if(tab==="settings")return null;
+return<button className="add-b" onClick={()=>{setEditTask(null);setShowForm(true)}}><span>+</span> {tt.tasks}</button>;
 };
 
 
@@ -723,14 +947,28 @@ return<div>
 </div>)}
 </div>}
 
-<div className="hdr"><div className="hdr-brand"><div className="hdr-logo">⚡</div><div><h1>Smart Planner</h1><small>{fmt(now)}</small></div></div>
-<div className="tabs">{TABS.map(t=><button key={t} className={`tab ${tab===t?"on":""}`} onClick={()=>setTab(t)}><span className="tab-icon">{TAB_ICONS[t]}</span>{t}</button>)}</div>
-<div style={{display:"flex",gap:8}}>{renderAddBtn()}<button className="set-b" onClick={()=>setShowSettings(true)} title="Настройки">⚙</button></div></div>
+{/* Dynamic header with settings-based tabs and branding */}
+{(()=>{
+const cfg=data.settings||{};
+const lang=cfg.lang||"ru";
+const t=I18N[lang]||I18N.ru;
+const appName=cfg.app_name||"Smart Planner";
+const logoB64=cfg.logo_base64;
+const tv=cfg.tabs_visible||{};
+const tabMap={panel:t.panel,tasks:t.tasks,meetings:t.meetings,cycles:t.cycles,today:t.today,journal:t.journal,analytics:t.analytics,export:t.export,settings:t.settings};
+const visibleTabs=TAB_KEYS.filter(k=>tv[k]!==false);
+
+return<div className="hdr"><div className="hdr-brand">
+{logoB64?<img src={logoB64} style={{width:38,height:38,borderRadius:12,objectFit:"cover"}}/>:<div className="hdr-logo">⚡</div>}
+<div><h1>{appName}</h1><small>{fmt(now)}</small></div></div>
+<div className="tabs">{visibleTabs.map(k=>{const name=tabMap[k];return<button key={k} className={`tab ${tab===k?"on":""}`} onClick={()=>setTab(k)}><span className="tab-icon">{TAB_ICONS_MAP[k]}</span>{name}</button>})}</div>
+<div style={{display:"flex",gap:8}}>{renderAddBtn()}</div></div>
+})()}
 
 <div className="main">
 
 {/* ═══ ПАНЕЛЬ ═══ */}
-{tab==="Панель"&&<>
+{tab==="panel"&&<>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
 <div style={{fontSize:22,fontWeight:800}}>📊 Панель</div>
 <div className="seg">{[["all","Всё время"],["today","Сегодня"],["week","Неделя"],["month","Месяц"],["quarter","Квартал"],["year","Год"]].map(([k,l])=><button key={k} className={panelPeriod===k?"on":""} onClick={()=>setPanelPeriod(k)}>{l}</button>)}</div>
@@ -751,7 +989,7 @@ return<div>
 </>}
 
 {/* ═══ ЗАДАЧИ ═══ */}
-{tab==="Задачи"&&<><div className="filter-bar">
+{tab==="tasks"&&<><div className="filter-bar">
 <div className="seg">{[["active","Активные"],["all","Все"],["completed","Готовые"]].map(([k,l])=><button key={k} className={filter===k?"on":""} onClick={()=>setFilter(k)}>{l}</button>)}</div>
 <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:12,background:"var(--bg3)",color:"var(--text)"}}>
 <option value="deadline">По дедлайну</option><option value="priority">По приоритету</option><option value="category">По категории</option><option value="created">По дате создания</option>
@@ -778,7 +1016,7 @@ return<div key={t.id} className={`tr ${st.l==="Выполнено"?"done":""}`} 
 </div></>}
 
 {/* ═══ СОВЕЩАНИЯ ═══ */}
-{tab==="Совещания"&&<>
+{tab==="meetings"&&<>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
 <div><div style={{fontSize:22,fontWeight:800,color:"var(--cyan2)"}}>🕐 Совещания</div></div>
 </div>
@@ -832,7 +1070,7 @@ return<div key={d} className={`sc ${d===now?"td":""}`}>{match.map(m=><span key={
 </>}
 
 {/* ═══ ЦИКЛЫ ═══ */}
-{tab==="Циклы"&&<>
+{tab==="cycles"&&<>
 <div style={{fontSize:22,fontWeight:800,marginBottom:16}}>🔁 Циклические действия</div>
 <div style={{color:"var(--text3)",fontSize:13,marginBottom:20}}>Задачи и совещания, которые создаются автоматически</div>
 {data.recurring.length===0?<div style={{textAlign:"center",padding:60,color:"var(--text4)"}}><div style={{fontSize:48,marginBottom:10}}>🔁</div><div style={{fontWeight:700,fontSize:16}}>Нет циклических действий</div><div style={{fontSize:13,marginTop:4}}>Создайте первое — кнопка «+ Цикл» вверху</div></div>:
@@ -862,7 +1100,7 @@ return<div key={r.id} className="card" style={{borderLeft:`3px solid ${r.kind===
 </>}
 
 {/* ═══ СЕГОДНЯ ═══ */}
-{tab==="Сегодня"&&<>
+{tab==="today"&&<>
 <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
 <div><div style={{fontWeight:800,fontSize:22,color:"var(--accent)"}}>{fmt(now)}</div><div style={{color:"var(--text3)",fontSize:13,marginTop:2}}>{todayL.length} задач · {todayMeetings.length} совещаний</div></div>
 <select value={todaySort} onChange={e=>setTodaySort(e.target.value)} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:12,background:"var(--bg3)"}}>
@@ -888,7 +1126,7 @@ return<div key={r.id} className="card" style={{borderLeft:`3px solid ${r.kind===
 </>}
 
 {/* ═══ ЖУРНАЛ ═══ */}
-{tab==="Журнал"&&<>
+{tab==="journal"&&<>
 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
 <button className="bo" style={{padding:"6px 12px"}} onClick={()=>{const[y,m]=habMonth.split("-").map(Number);const d=new Date(y,m-2,1);setHabMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`)}} >←</button>
 <input type="month" value={habMonth} onChange={e=>setHabMonth(e.target.value)} style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:13,fontWeight:600,background:"var(--bg3)"}}/>
@@ -907,7 +1145,7 @@ return completed.map((t,i)=><tr key={t.id||i} style={{background:i%2===0?"#FFFFF
 </>}
 
 {/* ═══ АНАЛИТИКА ═══ */}
-{tab==="Аналитика"&&(()=>{
+{tab==="analytics"&&(()=>{
 const anFiltered=tasksOnly.filter(t=>{if(!t.name)return false;if(anCat&&t.cat!==anCat)return false;if(anPri&&t.pri!==anPri)return false;const[f,to]=periodRange(anPeriod);return inPeriod(t,f,to)});
 const anS={total:0,done:0,active:0,burn:0,over:0};anFiltered.forEach(t=>{anS.total++;const st=getS(t,now).l;if(st==="Выполнено")anS.done++;else if(st==="Просрочено")anS.over++;else if(st==="Горит")anS.burn++;else if(st==="В работе")anS.active++;});
 const anPct=anS.total?Math.round(anS.done/anS.total*100):0;const anAvg=anS.total?Math.round(anFiltered.reduce((a,t)=>a+(t.progress||0),0)/anS.total):0;
@@ -947,7 +1185,7 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 </div></div>})()}
 
 {/* ═══ ЭКСПОРТ ═══ */}
-{tab==="Экспорт"&&<div>
+{tab==="export"&&<div>
 <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>📄 Экспорт отчёта</div>
 <div style={{color:"var(--text3)",fontSize:13,marginBottom:20}}>Отчёт для руководителя</div>
 <div style={{display:"grid",gridTemplateColumns:"340px 1fr",gap:20}} className="two-col">
@@ -973,13 +1211,15 @@ return entries.length?<div className="bar-chart">{entries.map(([c,n])=><div key=
 <div className="card" style={{padding:0,overflow:"hidden"}}><iframe srcDoc={expPreview} style={{width:"100%",height:"calc(100vh - 200px)",border:"none",borderRadius:16}} title="report"/></div></div>}</div>
 </div></div>}
 
+{/* ═══ НАСТРОЙКИ ═══ */}
+{tab==="settings"&&<SettingsPage settings={data.settings||{}} onSave={async s=>{await callApi("save_settings",JSON.stringify(s));reload()}} onReset={async()=>{await callApi("reset_settings");reload()}} showToast={showToast} data={data} onUpdate={reload} lang={(data.settings||{}).lang||"ru"}/>}
+
 </div>
 
 {showForm&&<TForm onClose={()=>{setShowForm(false);setEditTask(null)}} initial={editTask} cats={data.categories} pris={data.priorities} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
 {showMForm&&<MForm onClose={()=>{setShowMForm(false);setEditTask(null)}} initial={editTask} pris={data.priorities} onSubmit={t=>{if(editTask)updT(editTask.id,t);else addT(t)}}/>}
 {showRForm&&<RForm onClose={()=>{setShowRForm(false);setEditRec(null)}} initial={editRec} cats={data.categories} pris={data.priorities} onSubmit={async r=>{if(editRec){await callApi("update_recurring",editRec.id,JSON.stringify(r))}else{await callApi("add_recurring",JSON.stringify(r))}reload()}}/>}
 {detailTask&&<TDetail task={data.tasks.find(x=>x.id===detailTask.id)||detailTask} onClose={()=>setDetailTask(null)} now={now} onEdit={t=>{setDetailTask(null);setEditTask(t);if(t.type==="meeting")setShowMForm(true);else setShowForm(true)}} onDelete={delT} onProg={setProg} onSaveResult={async(id,text)=>{await callApi("update_task",id,JSON.stringify({meetingResult:text}));reload()}}/>}
-{showSettings&&<Settings data={data} onClose={()=>setShowSettings(false)} onUpdate={reload} showToast={showToast}/>}
 {toast&&<Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)}/>}
 {drillKpi&&<KpiDrill kpi={drillKpi} tasks={panelTasks} now={now} onClose={()=>setDrillKpi(null)} onOpenTask={t=>setDetailTask(t)}/>}
 </div>}
