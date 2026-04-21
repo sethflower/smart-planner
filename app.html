@@ -955,12 +955,15 @@ const taskRow=(t,showDeadline)=>{const st=getS(t,now);const cc=st.c==='var(--gre
 
 /* Meeting stats — ТОЛЬКО ПРОШЕДШИЕ совещания (либо отмеченные как проведённые, либо прошедшая дата) */
 const expMeetingsPast=expMeetings.filter(m=>{
-  // Exclude future meetings — only show what happened during/before the report period
-  if(m.deadline&&m.deadline>=now)return false; // future meetings
-  if(m.start&&m.start>now)return false;
+  // Include past + today meetings. Exclude only future.
+  // A meeting counts as "past/conducted" if: it's marked completed, OR it has a result, OR its date has passed/is today.
+  if(m.progress>=100)return true;
+  if(m.meetingResult&&m.meetingResult.trim())return true;
+  if(m.deadline&&m.deadline>now)return false; // strictly future
+  if(!m.deadline&&m.start&&m.start>now)return false;
   return true;
 });
-const mtgDone=expMeetingsPast.filter(m=>m.progress>=100);
+const mtgDone=expMeetingsPast.filter(m=>m.progress>=100||(m.meetingResult&&m.meetingResult.trim()));
 const mtgWithResult=expMeetingsPast.filter(m=>m.meetingResult&&m.meetingResult.trim());
 
 const mtgBlock=expIncMeetings&&expMeetingsPast.length?`
@@ -1080,7 +1083,7 @@ td{padding:11px 12px;border-bottom:1px solid #F0F4FA;vertical-align:top}
 <div class="summary-item"><div class="sum-label">В критической зоне</div><div class="sum-value">${burning.length+overdue.length} (горит ${burning.length} + просрочено ${overdue.length})</div></div>
 <div class="summary-item"><div class="sum-label">Выполнено в срок</div><div class="sum-value">${onTimeRate!==null?onTimeRate+'%':'нет завершённых'}</div></div>
 <div class="summary-item"><div class="sum-label">Средняя скорость</div><div class="sum-value">${avgTimeDays!==null?avgTimeDays+' дн. на задачу':'нет данных'}</div></div>
-${expIncMeetings?`<div class="summary-item"><div class="sum-label">Совещаний за период</div><div class="sum-value">${expMeetings.length} (${mtgDone.length} проведено, ${mtgWithResult.length} с результатом)</div></div>`:''}
+${expIncMeetings?`<div class="summary-item"><div class="sum-label">Совещаний за период</div><div class="sum-value">${expMeetingsPast.length} (${mtgDone.length} проведено, ${mtgWithResult.length} с результатом)</div></div>`:''}
 </div>
 <div class="narrative"><strong>Ключевые факты:</strong> За период с ${fmt(expFrom)} по ${fmt(expTo)} обработано <strong>${expStats.total}</strong> задач, из них завершено <strong>${done.length}</strong> (${expStats.pct}%).${onTimeRate!==null?' В срок выполнено <strong>'+onTimeRate+'%</strong>.':''}${avgTimeDays!==null?' Средняя продолжительность — <strong>'+avgTimeDays+'</strong> дн.':''}${expIncMeetings&&expMeetings.length?' Проведено <strong>'+mtgDone.length+'</strong> совещаний из <strong>'+expMeetings.length+'</strong> запланированных.':''}</div>
 </div>
