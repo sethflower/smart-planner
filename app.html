@@ -681,7 +681,6 @@ const[search,setSearch]=useState("");
 const[saveHint,setSaveHint]=useState("");
 const[confirmDel,setConfirmDel]=useState(null);
 const[showColorPicker,setShowColorPicker]=useState(false);
-const[mobileView,setMobileView]=useState("list");
 
 useEffect(()=>{
 try{const raw=localStorage.getItem(STORAGE_KEY);
@@ -701,7 +700,7 @@ return()=>clearTimeout(t);
 
 const active=notes.find(n=>n.id===activeId);
 
-const createNote=()=>{const n={id:Date.now(),title:"",content:"",color:"default",pinned:false,updatedAt:Date.now(),createdAt:Date.now()};setNotes(p=>[n,...p]);setActiveId(n.id);setMobileView("edit");setSearch("")};
+const createNote=()=>{const n={id:Date.now(),title:"",content:"",color:"default",pinned:false,updatedAt:Date.now(),createdAt:Date.now()};setNotes(p=>[n,...p]);setActiveId(n.id);setSearch("")};
 const updateActive=(patch)=>{setNotes(p=>p.map(n=>n.id===activeId?{...n,...patch,updatedAt:Date.now()}:n))};
 const deleteNote=(id)=>{setNotes(p=>{const newList=p.filter(n=>n.id!==id);if(id===activeId)setActiveId(newList[0]?.id||null);return newList});setConfirmDel(null)};
 const togglePin=(id)=>{setNotes(p=>p.map(n=>n.id===id?{...n,pinned:!n.pinned,updatedAt:Date.now()}:n))};
@@ -760,9 +759,9 @@ if(!active)return<div style={{padding:60,textAlign:"center",color:"var(--text4)"
 
 const activeColor=getColor(active.color);
 
-return<div style={{display:"grid",gridTemplateColumns:"340px 1fr",gap:16,height:"calc(100vh - 230px)",minHeight:500}} className="notes-layout">
+return<div style={{display:"grid",gridTemplateColumns:"320px minmax(0,1fr)",gap:16,height:"calc(100vh - 240px)",minHeight:560,width:"100%",maxWidth:"100%"}}>
 {/* LEFT: notes list */}
-<div style={{display:mobileView==="edit"?"none":"flex",flexDirection:"column",background:"var(--card)",border:"1px solid var(--border)",borderRadius:16,overflow:"hidden"}} className="notes-list">
+<div style={{display:"flex",flexDirection:"column",background:"var(--card)",border:"1px solid var(--border)",borderRadius:16,overflow:"hidden",minWidth:0}}>
 <div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:8,alignItems:"center"}}>
 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={"🔍 "+(lang==="uk"?"Пошук...":"Поиск...")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:13,background:"var(--bg)",outline:"none"}}/>
 <button className="bp" onClick={createNote} style={{width:"auto",padding:"8px 12px",fontSize:18,lineHeight:1,flexShrink:0}} title={lang==="uk"?"Нова нотатка":"Новая заметка"}>+</button>
@@ -770,7 +769,7 @@ return<div style={{display:"grid",gridTemplateColumns:"340px 1fr",gap:16,height:
 <div style={{flex:1,overflowY:"auto",padding:"8px"}}>
 {sorted.length===0?<div style={{padding:40,textAlign:"center",color:"var(--text4)",fontSize:13}}>{q?(lang==="uk"?"Нічого не знайдено":"Ничего не найдено"):(lang==="uk"?"Немає заміток":"Нет заметок")}</div>:
 sorted.map(n=>{const c=getColor(n.color);const isActive=n.id===activeId;
-return<div key={n.id} onClick={()=>{setActiveId(n.id);setMobileView("edit")}} style={{padding:"12px 14px",borderRadius:12,marginBottom:6,cursor:"pointer",background:isActive?c.bg:(n.color!=="default"?c.bg+"60":"var(--card2)"),border:isActive?`2px solid ${c.accent}`:`1px solid ${n.pinned?"#EAB308":"var(--border)"}`,position:"relative",transition:"all .15s"}}>
+return<div key={n.id} onClick={()=>setActiveId(n.id)} style={{padding:"12px 14px",borderRadius:12,marginBottom:6,cursor:"pointer",background:isActive?c.bg:(n.color!=="default"?c.bg+"60":"var(--card2)"),border:isActive?`2px solid ${c.accent}`:`1px solid ${n.pinned?"#EAB308":"var(--border)"}`,position:"relative",transition:"all .15s"}}>
 {n.pinned&&<div style={{position:"absolute",top:6,right:6,fontSize:11}}>⭐</div>}
 <div style={{fontSize:14,fontWeight:700,color:"var(--text)",marginBottom:3,paddingRight:n.pinned?18:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{firstLine(n)}</div>
 {preview(n)&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6,lineHeight:1.4,maxHeight:32,overflow:"hidden"}}>{preview(n)}</div>}
@@ -787,10 +786,9 @@ return<div key={n.id} onClick={()=>{setActiveId(n.id);setMobileView("edit")}} st
 </div>
 
 {/* RIGHT: editor */}
-<div style={{display:mobileView==="list"?"none":"flex",flexDirection:"column",background:activeColor.bg,border:`2px solid ${activeColor.accent}22`,borderRadius:16,overflow:"hidden",transition:"all .2s"}} className="notes-editor">
+<div style={{display:"flex",flexDirection:"column",background:activeColor.bg,border:`2px solid ${activeColor.accent}22`,borderRadius:16,overflow:"hidden",transition:"all .2s",minWidth:0}}>
 {/* Toolbar */}
 <div style={{padding:"10px 14px",borderBottom:`1px solid ${activeColor.accent}22`,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:activeColor.bg}}>
-<button onClick={()=>setMobileView("list")} className="notes-back-btn" style={{display:"none",background:"none",border:"none",fontSize:18,cursor:"pointer",padding:"4px 8px"}}>←</button>
 <button onClick={()=>togglePin(active.id)} title={active.pinned?(lang==="uk"?"Відкріпити":"Открепить"):(lang==="uk"?"Закріпити":"Закрепить")} style={{background:active.pinned?"#FEF3C7":"transparent",border:`1px solid ${active.pinned?"#EAB308":"var(--border)"}`,borderRadius:8,padding:"6px 10px",fontSize:14,cursor:"pointer"}}>{active.pinned?"⭐":"☆"}</button>
 <div style={{position:"relative"}}>
 <button onClick={()=>setShowColorPicker(v=>!v)} title={lang==="uk"?"Колір":"Цвет"} style={{background:activeColor.accent+"22",border:`1px solid ${activeColor.accent}55`,borderRadius:8,padding:"6px 10px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:6,color:activeColor.accent,fontWeight:600}}><span style={{width:12,height:12,borderRadius:"50%",background:activeColor.accent,display:"inline-block"}}/>{activeColor.label}</button>
@@ -822,9 +820,9 @@ return<div key={n.id} onClick={()=>{setActiveId(n.id);setMobileView("edit")}} st
 <input value={active.title} onChange={e=>updateActive({title:e.target.value})} placeholder={lang==="uk"?"Назва (необов'язково)":"Название (необязательно)"} style={{padding:"16px 22px 8px 22px",border:"none",outline:"none",fontSize:22,fontWeight:800,background:"transparent",color:"var(--text)",fontFamily:"var(--font)"}}/>
 
 {/* Split: editor + preview */}
-<div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,overflow:"hidden",borderTop:`1px dashed ${activeColor.accent}33`}} className="notes-split">
-<textarea id="note-editor" value={active.content} onChange={e=>updateActive({content:e.target.value})} placeholder={lang==="uk"?"Почніть писати тут...\n\nВикористовуйте **жирний**, *курсив*, # заголовок, - список, - [ ] задача":"Начните писать здесь...\n\nИспользуйте **жирный**, *курсив*, # заголовок, - список, - [ ] задача"} style={{padding:"16px 22px",border:"none",outline:"none",resize:"none",fontSize:15,fontFamily:"var(--mono)",lineHeight:1.7,background:"transparent",color:"var(--text)",borderRight:`1px dashed ${activeColor.accent}33`}}/>
-<div style={{padding:"16px 22px",overflowY:"auto",fontSize:15,fontFamily:"var(--font)",lineHeight:1.7,color:"var(--text)",background:"#ffffff60"}}>
+<div style={{flex:1,display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:0,overflow:"hidden",borderTop:`1px dashed ${activeColor.accent}33`}}>
+<textarea id="note-editor" value={active.content} onChange={e=>updateActive({content:e.target.value})} placeholder={lang==="uk"?"Почніть писати тут...\n\nВикористовуйте **жирний**, *курсив*, # заголовок, - список, - [ ] задача":"Начните писать здесь...\n\nИспользуйте **жирный**, *курсив*, # заголовок, - список, - [ ] задача"} style={{padding:"16px 22px",border:"none",outline:"none",resize:"none",fontSize:15,fontFamily:"var(--mono)",lineHeight:1.7,background:"transparent",color:"var(--text)",borderRight:`1px dashed ${activeColor.accent}33`,minWidth:0,width:"100%"}}/>
+<div style={{padding:"16px 22px",overflowY:"auto",fontSize:15,fontFamily:"var(--font)",lineHeight:1.7,color:"var(--text)",background:"#ffffff60",minWidth:0,wordBreak:"break-word"}}>
 {active.content.trim()?renderContent(active.content):<div style={{color:"var(--text4)",fontStyle:"italic"}}>{lang==="uk"?"Попередній перегляд...":"Предпросмотр..."}</div>}
 </div>
 </div>
