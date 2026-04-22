@@ -681,22 +681,23 @@ const[search,setSearch]=useState("");
 const[saveHint,setSaveHint]=useState("");
 const[confirmDel,setConfirmDel]=useState(null);
 const[showColorPicker,setShowColorPicker]=useState(false);
+const[loaded,setLoaded]=useState(false);
 
 useEffect(()=>{
 try{const raw=localStorage.getItem(STORAGE_KEY);
-if(raw){const parsed=JSON.parse(raw);if(Array.isArray(parsed)&&parsed.length){setNotes(parsed);setActiveId(parsed[0].id);return}}
+if(raw){const parsed=JSON.parse(raw);if(Array.isArray(parsed)&&parsed.length){setNotes(parsed);setActiveId(parsed[0].id);setLoaded(true);return}}
 }catch(e){}
 const first={id:Date.now(),title:"",content:"",color:"default",pinned:false,updatedAt:Date.now(),createdAt:Date.now()};
-setNotes([first]);setActiveId(first.id);
+setNotes([first]);setActiveId(first.id);setLoaded(true);
 },[]);
 
 useEffect(()=>{
-if(!notes.length)return;
+if(!loaded)return;
 const t=setTimeout(()=>{
 try{localStorage.setItem(STORAGE_KEY,JSON.stringify(notes));setSaveHint(lang==="uk"?"✓ Збережено":"✓ Сохранено");setTimeout(()=>setSaveHint(""),1500)}catch(e){setSaveHint(lang==="uk"?"✗ Помилка":"✗ Ошибка")}
 },400);
 return()=>clearTimeout(t);
-},[notes,lang]);
+},[notes,lang,loaded]);
 
 const active=notes.find(n=>n.id===activeId);
 
