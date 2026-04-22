@@ -174,7 +174,7 @@ const diffD=(a,b)=>Math.round((new Date(a)-new Date(b))/864e5);
 const I18N={
 ru:{
 /* Tabs */
-panel:"Панель",tasks:"Задачи",meetings:"Совещания",cycles:"Циклы",today:"Сегодня",journal:"Журнал",analytics:"Аналитика",export:"Экспорт",settings:"Настройки",
+panel:"Панель",tasks:"Задачи",meetings:"Совещания",cycles:"Циклы",today:"Сегодня",journal:"Журнал",analytics:"Аналитика",export:"Экспорт",utils:"Утилиты",settings:"Настройки",
 /* Statuses */
 total:"Всего",done:"Выполнено",active:"В работе",burning:"Горит",overdue:"Просрочено",new_task:"Новая",
 /* Fields */
@@ -278,7 +278,7 @@ delete_only_rule:"Только правило",delete_with_future:"С будущ
 },
 uk:{
 /* Tabs */
-panel:"Панель",tasks:"Завдання",meetings:"Наради",cycles:"Цикли",today:"Сьогодні",journal:"Журнал",analytics:"Аналітика",export:"Експорт",settings:"Налаштування",
+panel:"Панель",tasks:"Завдання",meetings:"Наради",cycles:"Цикли",today:"Сьогодні",journal:"Журнал",analytics:"Аналітика",export:"Експорт",utils:"Утиліти",settings:"Налаштування",
 /* Statuses */
 total:"Всього",done:"Виконано",active:"В роботі",burning:"Горить",overdue:"Прострочено",new_task:"Нове",
 /* Fields */
@@ -382,8 +382,8 @@ delete_only_rule:"Лише правило",delete_with_future:"З майбутн
 }
 };
 
-const TAB_KEYS=["panel","tasks","meetings","cycles","today","journal","analytics","export","settings"];
-const TAB_ICONS_MAP={panel:"\ud83d\udcca",tasks:"\ud83d\udccb",meetings:"\ud83d\udd52",cycles:"\ud83d\udd01",today:"\u2600\ufe0f",journal:"\ud83d\udcd3",analytics:"\ud83d\udcc8",export:"\ud83d\udcc4",settings:"\u2699\ufe0f"};
+const TAB_KEYS=["panel","tasks","meetings","cycles","today","journal","analytics","export","utils","settings"];
+const TAB_ICONS_MAP={panel:"\ud83d\udcca",tasks:"\ud83d\udccb",meetings:"\ud83d\udd52",cycles:"\ud83d\udd01",today:"\u2600\ufe0f",journal:"\ud83d\udcd3",analytics:"\ud83d\udcc8",export:"\ud83d\udcc4",utils:"\ud83e\uddf0",settings:"\u2699\ufe0f"};
 
 /* Legacy compat: components still reference these */
 const TABS=["Панель","Задачи","Совещания","Циклы","Сегодня","Журнал","Аналитика","Экспорт","Настройки"];
@@ -1949,6 +1949,9 @@ return<tr key={c} style={{borderTop:"1px solid var(--border)"}}>
 <div className="card" style={{padding:0,overflow:"hidden"}}><iframe srcDoc={expPreview} style={{width:"100%",height:"calc(100vh - 200px)",border:"none",borderRadius:16}} title="report"/></div></div>}</div>
 </div></div>})()}
 
+{/* ═══ УТИЛИТЫ ═══ */}
+{tab==="utils"&&(()=>{const Lg=I18N[(data.settings||{}).lang||"ru"]||I18N.ru;return<UtilsPage lang={(data.settings||{}).lang||"ru"} showToast={showToast}/>})()}
+  
 {/* ═══ НАСТРОЙКИ ═══ */}
 {tab==="settings"&&<SettingsPage settings={data.settings||{}} onSave={async s=>{await callApi("save_settings",JSON.stringify(s));reload()}} onReset={async()=>{await callApi("reset_settings");reload()}} showToast={showToast} data={data} onUpdate={reload} lang={(data.settings||{}).lang||"ru"}/>}
 
