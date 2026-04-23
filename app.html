@@ -155,7 +155,13 @@ button:active{transform:scale(.96)}
 .rec-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all .2s;border-left:3px solid var(--purple)}
 .rec-card:hover{border-color:var(--purple);box-shadow:0 4px 16px rgba(139,92,246,.08);transform:translateY(-1px)}
 .rec-card.paused{opacity:.5;border-left-color:var(--text4)}
-@media(max-width:768px){.hdr{padding:0 14px;gap:8px;height:auto;flex-wrap:wrap;padding:12px 14px}.tabs{overflow-x:auto;height:auto;gap:0}.tab{padding:10px 12px;font-size:12px}.tab.on::after{bottom:-2px}.main{padding:16px 14px}.kpi-r{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr!important}.analytics-grid{grid-template-columns:1fr}.dp{width:100vw}.notes-layout{grid-template-columns:1fr!important;height:calc(100vh - 200px)!important}.notes-split{grid-template-columns:1fr!important}.notes-back-btn{display:inline-block!important}}
+@media(max-width:768px){
+.hdr{padding:0 14px;gap:8px;height:auto;flex-wrap:wrap;padding:12px 14px}
+.main{padding:16px 14px}
+.kpi-r{grid-template-columns:repeat(2,1fr)}
+.analytics-grid{grid-template-columns:1fr}
+.dp{width:100vw}
+}
 </style>
 </head>
 <body>
@@ -174,7 +180,7 @@ const diffD=(a,b)=>Math.round((new Date(a)-new Date(b))/864e5);
 const I18N={
 ru:{
 /* Tabs */
-panel:"Панель",tasks:"Задачи",meetings:"Совещания",cycles:"Циклы",today:"Сегодня",journal:"Журнал",analytics:"Аналитика",export:"Экспорт",utils:"Утилиты",settings:"Настройки",
+panel:"Панель",tasks:"Задачи",meetings:"Совещания",cycles:"Циклы",today:"Сегодня",journal:"Журнал",analytics:"Аналитика",export:"Экспорт",settings:"Настройки",
 /* Statuses */
 total:"Всего",done:"Выполнено",active:"В работе",burning:"Горит",overdue:"Просрочено",new_task:"Новая",
 /* Fields */
@@ -278,7 +284,7 @@ delete_only_rule:"Только правило",delete_with_future:"С будущ
 },
 uk:{
 /* Tabs */
-panel:"Панель",tasks:"Завдання",meetings:"Наради",cycles:"Цикли",today:"Сьогодні",journal:"Журнал",analytics:"Аналітика",export:"Експорт",utils:"Утиліти",settings:"Налаштування",
+panel:"Панель",tasks:"Завдання",meetings:"Наради",cycles:"Цикли",today:"Сьогодні",journal:"Журнал",analytics:"Аналітика",export:"Експорт",settings:"Налаштування",
 /* Statuses */
 total:"Всього",done:"Виконано",active:"В роботі",burning:"Горить",overdue:"Прострочено",new_task:"Нове",
 /* Fields */
@@ -382,8 +388,8 @@ delete_only_rule:"Лише правило",delete_with_future:"З майбутн
 }
 };
 
-const TAB_KEYS=["panel","tasks","meetings","cycles","today","journal","analytics","export","utils","settings"];
-const TAB_ICONS_MAP={panel:"\ud83d\udcca",tasks:"\ud83d\udccb",meetings:"\ud83d\udd52",cycles:"\ud83d\udd01",today:"\u2600\ufe0f",journal:"\ud83d\udcd3",analytics:"\ud83d\udcc8",export:"\ud83d\udcc4",utils:"\ud83e\uddf0",settings:"\u2699\ufe0f"};
+const TAB_KEYS=["panel","tasks","meetings","cycles","today","journal","analytics","export","settings"];
+const TAB_ICONS_MAP={panel:"\ud83d\udcca",tasks:"\ud83d\udccb",meetings:"\ud83d\udd52",cycles:"\ud83d\udd01",today:"\u2600\ufe0f",journal:"\ud83d\udcd3",analytics:"\ud83d\udcc8",export:"\ud83d\udcc4",settings:"\u2699\ufe0f"};
 
 /* Legacy compat: components still reference these */
 const TABS=["Панель","Задачи","Совещания","Циклы","Сегодня","Журнал","Аналитика","Экспорт","Настройки"];
@@ -644,261 +650,7 @@ return<div className="mo" onClick={onClose}><div className="md" onClick={e=>e.st
 </div></div></div>
 }
 
-/* ═══════════════ UTILITIES PAGE ═══════════════ */
-function UtilsPage({lang,showToast}){
-const L=I18N[lang||"ru"]||I18N.ru;
-const[tool,setTool]=useState("notes");
-const tools=[
-{key:"notes",icon:"📒",label:lang==="uk"?"Блокнот":"Блокнот"},
-{key:"calc",icon:"🧮",label:lang==="uk"?"Калькулятор":"Калькулятор"},
-];
-return<div>
-<div style={{fontSize:22,fontWeight:800,marginBottom:6}}>🧰 {L.utils||"Утилиты"}</div>
-<div style={{color:"var(--text3)",fontSize:13,marginBottom:20}}>{lang==="uk"?"Інструменти для щоденної роботи":"Инструменты для повседневной работы"}</div>
-<div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
-{tools.map(t=><button key={t.key} onClick={()=>setTool(t.key)} style={{padding:"12px 22px",borderRadius:14,border:`2px solid ${tool===t.key?"var(--accent)":"var(--border)"}`,background:tool===t.key?"var(--accent-bg)":"#fff",color:tool===t.key?"var(--accent)":"var(--text2)",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8,boxShadow:tool===t.key?"0 4px 14px rgba(67,97,238,.15)":"0 1px 3px rgba(0,0,0,.04)",transition:"all .2s"}}>{t.icon} {t.label}</button>)}
-</div>
-{tool==="notes"&&<NotesUtil lang={lang} showToast={showToast}/>}
-{tool==="calc"&&<CalcUtil lang={lang}/>}
-</div>}
 
-/* ─── Notes — полноценный блокнот с несколькими заметками ─── */
-function NotesUtil({lang,showToast}){
-const STORAGE_KEY="sp_notes_v2";
-const COLORS=[
-{key:"default",bg:"#FFFFFF",accent:"#64748B",label:lang==="uk"?"Звичайна":"Обычная"},
-{key:"yellow",bg:"#FEF9C3",accent:"#EAB308",label:lang==="uk"?"Жовта":"Жёлтая"},
-{key:"green",bg:"#DCFCE7",accent:"#16A34A",label:lang==="uk"?"Зелена":"Зелёная"},
-{key:"blue",bg:"#DBEAFE",accent:"#2563EB",label:lang==="uk"?"Синя":"Синяя"},
-{key:"pink",bg:"#FCE7F3",accent:"#DB2777",label:lang==="uk"?"Рожева":"Розовая"},
-{key:"purple",bg:"#EDE9FE",accent:"#7C3AED",label:lang==="uk"?"Фіолетова":"Фиолетовая"},
-];
-const getColor=k=>COLORS.find(c=>c.key===k)||COLORS[0];
-
-const[notes,setNotes]=useState([]);
-const[activeId,setActiveId]=useState(null);
-const[search,setSearch]=useState("");
-const[saveHint,setSaveHint]=useState("");
-const[confirmDel,setConfirmDel]=useState(null);
-const[showColorPicker,setShowColorPicker]=useState(false);
-const[loaded,setLoaded]=useState(false);
-
-useEffect(()=>{
-try{const raw=localStorage.getItem(STORAGE_KEY);
-if(raw){const parsed=JSON.parse(raw);if(Array.isArray(parsed)&&parsed.length){setNotes(parsed);setActiveId(parsed[0].id);setLoaded(true);return}}
-}catch(e){}
-const first={id:Date.now(),title:"",content:"",color:"default",pinned:false,updatedAt:Date.now(),createdAt:Date.now()};
-setNotes([first]);setActiveId(first.id);setLoaded(true);
-},[]);
-
-useEffect(()=>{
-if(!loaded)return;
-const t=setTimeout(()=>{
-try{localStorage.setItem(STORAGE_KEY,JSON.stringify(notes));setSaveHint(lang==="uk"?"✓ Збережено":"✓ Сохранено");setTimeout(()=>setSaveHint(""),1500)}catch(e){setSaveHint(lang==="uk"?"✗ Помилка":"✗ Ошибка")}
-},400);
-return()=>clearTimeout(t);
-},[notes,lang,loaded]);
-
-const active=notes.find(n=>n.id===activeId);
-
-const createNote=()=>{const n={id:Date.now(),title:"",content:"",color:"default",pinned:false,updatedAt:Date.now(),createdAt:Date.now()};setNotes(p=>[n,...p]);setActiveId(n.id);setSearch("")};
-const updateActive=(patch)=>{setNotes(p=>p.map(n=>n.id===activeId?{...n,...patch,updatedAt:Date.now()}:n))};
-const deleteNote=(id)=>{setNotes(p=>{const newList=p.filter(n=>n.id!==id);if(id===activeId)setActiveId(newList[0]?.id||null);return newList});setConfirmDel(null)};
-const togglePin=(id)=>{setNotes(p=>p.map(n=>n.id===id?{...n,pinned:!n.pinned,updatedAt:Date.now()}:n))};
-const duplicateNote=(id)=>{const src=notes.find(n=>n.id===id);if(!src)return;const copy={...src,id:Date.now(),updatedAt:Date.now(),createdAt:Date.now(),title:src.title+(lang==="uk"?" (копія)":" (копия)")};setNotes(p=>[copy,...p]);setActiveId(copy.id)};
-const exportNote=(n)=>{const blob=new Blob([(n.title?n.title+"\n\n":"")+n.content],{type:"text/plain;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(n.title||"note").replace(/[^\w\s-]/g,"").trim().substring(0,50)+".txt";a.click();URL.revokeObjectURL(url)};
-
-const firstLine=(n)=>{const src=n.title||n.content||"";return src.split("\n")[0].replace(/[*#_`\[\]]/g,"").trim()||(lang==="uk"?"Без назви":"Без названия")};
-const preview=(n)=>{const src=n.content||"";const lines=src.split("\n").filter(l=>l.trim()).slice(n.title?0:1);return lines.join(" ").replace(/[*#_`\[\]]/g,"").substring(0,90)};
-
-const q=search.toLowerCase().trim();
-const filtered=notes.filter(n=>!q||(n.title||"").toLowerCase().includes(q)||(n.content||"").toLowerCase().includes(q));
-const sorted=[...filtered].sort((a,b)=>{if(a.pinned!==b.pinned)return b.pinned?1:-1;return b.updatedAt-a.updatedAt});
-
-const fmtDate=(ts)=>{const d=new Date(ts);const n=new Date();const diff=(n-d)/1000;if(diff<60)return lang==="uk"?"щойно":"только что";if(diff<3600)return Math.floor(diff/60)+(lang==="uk"?" хв":" мин");if(d.toDateString()===n.toDateString())return d.toTimeString().substring(0,5);const y=new Date();y.setDate(y.getDate()-1);if(d.toDateString()===y.toDateString())return lang==="uk"?"вчора":"вчера";return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")};
-
-const chars=active?active.content.length:0;
-const words=active&&active.content.trim()?active.content.trim().split(/\s+/).length:0;
-const lines=active&&active.content?active.content.split("\n").length:0;
-
-/* Render markdown-lite for side preview */
-const renderContent=(text)=>{
-if(!text)return null;
-return text.split("\n").map((line,i)=>{
-if(line.startsWith("# "))return<div key={i} style={{fontSize:18,fontWeight:800,marginTop:8,marginBottom:4}}>{line.substring(2)}</div>;
-if(line.startsWith("## "))return<div key={i} style={{fontSize:16,fontWeight:700,marginTop:6,marginBottom:3}}>{line.substring(3)}</div>;
-if(line.match(/^\s*[-*]\s\[[ x]\]\s/i)){const checked=/\[x\]/i.test(line);const t=line.replace(/^\s*[-*]\s\[[ x]\]\s/i,"");return<div key={i} style={{display:"flex",gap:6,alignItems:"flex-start",margin:"2px 0",paddingLeft:4}}><span style={{fontSize:13,marginTop:2}}>{checked?"☑️":"☐"}</span><span style={{textDecoration:checked?"line-through":"none",color:checked?"var(--text4)":"var(--text)",flex:1}}>{t}</span></div>}
-if(line.match(/^\s*[-*]\s/)){return<div key={i} style={{paddingLeft:14,position:"relative",margin:"2px 0"}}><span style={{position:"absolute",left:4,color:"var(--text3)"}}>•</span>{line.replace(/^\s*[-*]\s/,"")}</div>}
-if(!line.trim())return<div key={i} style={{height:6}}/>;
-const parts=[];let rest=line;let key=0;
-const rx=/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/;
-while(rest){const m=rest.match(rx);if(!m){parts.push(<span key={key++}>{rest}</span>);break}const before=rest.substring(0,m.index);if(before)parts.push(<span key={key++}>{before}</span>);const t=m[0];if(t.startsWith("**"))parts.push(<strong key={key++}>{t.slice(2,-2)}</strong>);else if(t.startsWith("*"))parts.push(<em key={key++}>{t.slice(1,-1)}</em>);else if(t.startsWith("`"))parts.push(<code key={key++} style={{background:"var(--bg4)",padding:"1px 5px",borderRadius:4,fontFamily:"var(--mono)",fontSize:"92%"}}>{t.slice(1,-1)}</code>);rest=rest.substring(m.index+t.length)}
-return<div key={i} style={{margin:"2px 0",lineHeight:1.6}}>{parts}</div>;
-});
-};
-
-const insertFormatting=(type)=>{
-const ta=document.getElementById("note-editor");if(!ta||!active)return;
-const s=ta.selectionStart,e=ta.selectionEnd;const sel=active.content.substring(s,e);const before=active.content.substring(0,s);const after=active.content.substring(e);
-let wrapped="",cursorShift=0;
-if(type==="bold"){wrapped="**"+(sel||"текст")+"**";cursorShift=sel?0:-2}
-else if(type==="italic"){wrapped="*"+(sel||"текст")+"*";cursorShift=sel?0:-1}
-else if(type==="code"){wrapped="`"+(sel||"код")+"`";cursorShift=sel?0:-1}
-else if(type==="h1"){wrapped="# "+(sel||"Заголовок");cursorShift=0}
-else if(type==="h2"){wrapped="## "+(sel||"Подзаголовок");cursorShift=0}
-else if(type==="list"){wrapped=(sel||"пункт").split("\n").map(l=>"- "+l).join("\n");cursorShift=0}
-else if(type==="check"){wrapped=(sel||"задача").split("\n").map(l=>"- [ ] "+l).join("\n");cursorShift=0}
-updateActive({content:before+wrapped+after});
-setTimeout(()=>{ta.focus();const pos=s+wrapped.length+cursorShift;ta.setSelectionRange(pos,pos)},0);
-};
-
-if(!active)return<div style={{padding:60,textAlign:"center",color:"var(--text4)"}}>
-<div style={{fontSize:56,marginBottom:16}}>📝</div>
-<div style={{fontWeight:700,fontSize:18,marginBottom:8}}>{lang==="uk"?"Немає заміток":"Нет заметок"}</div>
-<button className="bp" onClick={createNote} style={{width:"auto",padding:"10px 24px",marginTop:12}}>➕ {lang==="uk"?"Створити першу":"Создать первую"}</button>
-</div>;
-
-const activeColor=getColor(active.color);
-
-return<div style={{display:"grid",gridTemplateColumns:"320px minmax(0,1fr)",gap:16,height:"calc(100vh - 240px)",minHeight:560,width:"100%",maxWidth:"100%"}}>
-{/* LEFT: notes list */}
-<div style={{display:"flex",flexDirection:"column",background:"var(--card)",border:"1px solid var(--border)",borderRadius:16,overflow:"hidden",minWidth:0}}>
-<div style={{padding:"14px 16px",borderBottom:"1px solid var(--border)",display:"flex",gap:8,alignItems:"center"}}>
-<input value={search} onChange={e=>setSearch(e.target.value)} placeholder={"🔍 "+(lang==="uk"?"Пошук...":"Поиск...")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"1.5px solid var(--border)",fontSize:13,background:"var(--bg)",outline:"none"}}/>
-<button className="bp" onClick={createNote} style={{width:"auto",padding:"8px 12px",fontSize:18,lineHeight:1,flexShrink:0}} title={lang==="uk"?"Нова нотатка":"Новая заметка"}>+</button>
-</div>
-<div style={{flex:1,overflowY:"auto",padding:"8px"}}>
-{sorted.length===0?<div style={{padding:40,textAlign:"center",color:"var(--text4)",fontSize:13}}>{q?(lang==="uk"?"Нічого не знайдено":"Ничего не найдено"):(lang==="uk"?"Немає заміток":"Нет заметок")}</div>:
-sorted.map(n=>{const c=getColor(n.color);const isActive=n.id===activeId;
-return<div key={n.id} onClick={()=>setActiveId(n.id)} style={{padding:"12px 14px",borderRadius:12,marginBottom:6,cursor:"pointer",background:isActive?c.bg:(n.color!=="default"?c.bg+"60":"var(--card2)"),border:isActive?`2px solid ${c.accent}`:`1px solid ${n.pinned?"#EAB308":"var(--border)"}`,position:"relative",transition:"all .15s"}}>
-{n.pinned&&<div style={{position:"absolute",top:6,right:6,fontSize:11}}>⭐</div>}
-<div style={{fontSize:14,fontWeight:700,color:"var(--text)",marginBottom:3,paddingRight:n.pinned?18:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{firstLine(n)}</div>
-{preview(n)&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:6,lineHeight:1.4,maxHeight:32,overflow:"hidden"}}>{preview(n)}</div>}
-<div style={{display:"flex",alignItems:"center",gap:6}}>
-<span style={{fontSize:10,color:"var(--text4)",fontFamily:"var(--mono)"}}>{fmtDate(n.updatedAt)}</span>
-{n.color!=="default"&&<span style={{width:8,height:8,borderRadius:"50%",background:c.accent,display:"inline-block"}}/>}
-</div>
-</div>})}
-</div>
-<div style={{padding:"10px 14px",borderTop:"1px solid var(--border)",fontSize:11,color:"var(--text4)",background:"var(--bg3)",display:"flex",justifyContent:"space-between"}}>
-<span>{notes.length} {lang==="uk"?"заміток":"заметок"}</span>
-<span>{saveHint}</span>
-</div>
-</div>
-
-{/* RIGHT: editor */}
-<div style={{display:"flex",flexDirection:"column",background:activeColor.bg,border:`2px solid ${activeColor.accent}22`,borderRadius:16,overflow:"hidden",transition:"all .2s",minWidth:0}}>
-{/* Toolbar */}
-<div style={{padding:"10px 14px",borderBottom:`1px solid ${activeColor.accent}22`,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:activeColor.bg}}>
-<button onClick={()=>togglePin(active.id)} title={active.pinned?(lang==="uk"?"Відкріпити":"Открепить"):(lang==="uk"?"Закріпити":"Закрепить")} style={{background:active.pinned?"#FEF3C7":"transparent",border:`1px solid ${active.pinned?"#EAB308":"var(--border)"}`,borderRadius:8,padding:"6px 10px",fontSize:14,cursor:"pointer"}}>{active.pinned?"⭐":"☆"}</button>
-<div style={{position:"relative"}}>
-<button onClick={()=>setShowColorPicker(v=>!v)} title={lang==="uk"?"Колір":"Цвет"} style={{background:activeColor.accent+"22",border:`1px solid ${activeColor.accent}55`,borderRadius:8,padding:"6px 10px",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:6,color:activeColor.accent,fontWeight:600}}><span style={{width:12,height:12,borderRadius:"50%",background:activeColor.accent,display:"inline-block"}}/>{activeColor.label}</button>
-{showColorPicker&&<div style={{position:"absolute",top:"calc(100% + 4px)",left:0,background:"#fff",border:"1px solid var(--border)",borderRadius:10,padding:6,boxShadow:"var(--shadow-lg)",zIndex:10,display:"flex",gap:4}}>
-{COLORS.map(c=><button key={c.key} onClick={()=>{updateActive({color:c.key});setShowColorPicker(false)}} title={c.label} style={{width:26,height:26,borderRadius:"50%",background:c.bg,border:active.color===c.key?`2.5px solid ${c.accent}`:"2px solid var(--border)",cursor:"pointer",padding:0}}/>)}
-</div>}
-</div>
-<div style={{width:1,height:22,background:activeColor.accent+"33"}}/>
-{[
-{i:"B",t:"bold",s:{fontWeight:800}},
-{i:"I",t:"italic",s:{fontStyle:"italic"}},
-{i:"</>",t:"code",s:{fontFamily:"var(--mono)",fontSize:11}},
-].map(b=><button key={b.t} onClick={()=>insertFormatting(b.t)} style={{background:"transparent",border:"1px solid transparent",borderRadius:6,padding:"6px 10px",fontSize:13,cursor:"pointer",color:"var(--text2)",...b.s}} onMouseEnter={e=>e.currentTarget.style.background=activeColor.accent+"18"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{b.i}</button>)}
-<div style={{width:1,height:22,background:activeColor.accent+"33"}}/>
-{[
-{i:"H1",t:"h1"},
-{i:"H2",t:"h2"},
-{i:"• "+(lang==="uk"?"Список":"Список"),t:"list"},
-{i:"☐ "+(lang==="uk"?"Задача":"Задача"),t:"check"},
-].map(b=><button key={b.t} onClick={()=>insertFormatting(b.t)} style={{background:"transparent",border:"1px solid transparent",borderRadius:6,padding:"6px 10px",fontSize:12,cursor:"pointer",color:"var(--text2)",fontWeight:600}} onMouseEnter={e=>e.currentTarget.style.background=activeColor.accent+"18"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{b.i}</button>)}
-<div style={{marginLeft:"auto",display:"flex",gap:4}}>
-<button onClick={()=>duplicateNote(active.id)} title={lang==="uk"?"Дублювати":"Дублировать"} style={{background:"transparent",border:"1px solid var(--border)",borderRadius:8,padding:"6px 10px",fontSize:13,cursor:"pointer"}}>⎘</button>
-<button onClick={()=>exportNote(active)} title={lang==="uk"?"Експорт .txt":"Экспорт .txt"} style={{background:"transparent",border:"1px solid var(--border)",borderRadius:8,padding:"6px 10px",fontSize:13,cursor:"pointer"}}>⬇</button>
-<button onClick={()=>setConfirmDel(active.id)} title={lang==="uk"?"Видалити":"Удалить"} style={{background:"transparent",border:"1px solid var(--red-bg)",borderRadius:8,padding:"6px 10px",fontSize:13,cursor:"pointer",color:"var(--red)"}}>🗑</button>
-</div>
-</div>
-
-{/* Title */}
-<input value={active.title} onChange={e=>updateActive({title:e.target.value})} placeholder={lang==="uk"?"Назва (необов'язково)":"Название (необязательно)"} style={{padding:"16px 22px 8px 22px",border:"none",outline:"none",fontSize:22,fontWeight:800,background:"transparent",color:"var(--text)",fontFamily:"var(--font)"}}/>
-
-{/* Split: editor + preview */}
-<div style={{flex:1,display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:0,overflow:"hidden",borderTop:`1px dashed ${activeColor.accent}33`}}>
-<textarea id="note-editor" value={active.content} onChange={e=>updateActive({content:e.target.value})} placeholder={lang==="uk"?"Почніть писати тут...\n\nВикористовуйте **жирний**, *курсив*, # заголовок, - список, - [ ] задача":"Начните писать здесь...\n\nИспользуйте **жирный**, *курсив*, # заголовок, - список, - [ ] задача"} style={{padding:"16px 22px",border:"none",outline:"none",resize:"none",fontSize:15,fontFamily:"var(--mono)",lineHeight:1.7,background:"transparent",color:"var(--text)",borderRight:`1px dashed ${activeColor.accent}33`,minWidth:0,width:"100%"}}/>
-<div style={{padding:"16px 22px",overflowY:"auto",fontSize:15,fontFamily:"var(--font)",lineHeight:1.7,color:"var(--text)",background:"#ffffff60",minWidth:0,wordBreak:"break-word"}}>
-{active.content.trim()?renderContent(active.content):<div style={{color:"var(--text4)",fontStyle:"italic"}}>{lang==="uk"?"Попередній перегляд...":"Предпросмотр..."}</div>}
-</div>
-</div>
-
-{/* Footer stats */}
-<div style={{padding:"8px 22px",borderTop:`1px solid ${activeColor.accent}22`,fontSize:11,color:"var(--text3)",display:"flex",gap:16,background:activeColor.bg}}>
-<span>{lang==="uk"?"Символів":"Символов"}: <strong style={{fontFamily:"var(--mono)",color:"var(--text)"}}>{chars}</strong></span>
-<span>{lang==="uk"?"Слів":"Слов"}: <strong style={{fontFamily:"var(--mono)",color:"var(--text)"}}>{words}</strong></span>
-<span>{lang==="uk"?"Рядків":"Строк"}: <strong style={{fontFamily:"var(--mono)",color:"var(--text)"}}>{lines}</strong></span>
-<span style={{marginLeft:"auto",color:"var(--text4)"}}>{new Date(active.updatedAt).toLocaleString(lang==="uk"?"uk-UA":"ru-RU")}</span>
-</div>
-</div>
-
-{confirmDel&&<Confirm title={lang==="uk"?"Видалити нотатку?":"Удалить заметку?"} text={lang==="uk"?"Цю дію неможливо скасувати.":"Это действие нельзя отменить."} onNo={()=>setConfirmDel(null)} onYes={()=>deleteNote(confirmDel)} yesLabel={lang==="uk"?"Видалити":"Удалить"} yesColor="var(--red)"/>}
-</div>}
-
-/* ─── Calculator — простой, красивый ─── */
-function CalcUtil({lang}){
-const[display,setDisplay]=useState("0");
-const[expr,setExpr]=useState("");
-const calculate=s=>{try{
-const clean=s.replace(/×/g,"*").replace(/÷/g,"/").replace(/,/g,".").replace(/[^0-9+\-*/().\s]/g,"");
-if(!clean)return "0";
-const r=Function(`"use strict";return(${clean})`)();
-if(!isFinite(r))return "Error";
-return String(Math.round(r*1e10)/1e10);
-}catch(e){return "Error"}};
-const press=k=>{
-if(k==="C"){setDisplay("0");setExpr("");return}
-if(k==="⌫"){const n=expr.slice(0,-1);setExpr(n);setDisplay(n||"0");return}
-if(k==="="){const r=calculate(expr);setDisplay(r);setExpr(r==="Error"?"":r);return}
-if(k==="±"){if(display!=="0"&&display!=="Error"){const r=String(-parseFloat(display));setDisplay(r);setExpr(r)}return}
-if(k==="%"){const r=String(parseFloat(display)/100);setDisplay(r);setExpr(r);return}
-const nextExpr=expr+k;setExpr(nextExpr);
-if("0123456789.".includes(k)){
-const parts=nextExpr.split(/[\+\-\×\÷]/);
-setDisplay(parts[parts.length-1]||"0");
-}else{setDisplay(k)}};
-useEffect(()=>{const h=e=>{const k=e.key;if(/[0-9]/.test(k))press(k);
-else if(k==="+"||k==="-")press(k);
-else if(k==="*")press("×");
-else if(k==="/"){e.preventDefault();press("÷")}
-else if(k===".")press(".");
-else if(k==="Enter"||k==="="){e.preventDefault();press("=")}
-else if(k==="Backspace")press("⌫");
-else if(k==="Escape")press("C");
-};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)});
-const btns=[
-["C","⌫","±","÷"],
-["7","8","9","×"],
-["4","5","6","-"],
-["1","2","3","+"],
-["0",".","%","="],
-];
-const btnStyle=(b)=>{
-const isOp=["÷","×","-","+","="].includes(b);
-const isAction=["C","⌫","±","%"].includes(b);
-const isEquals=b==="=";
-return{padding:"20px 0",borderRadius:14,border:"none",fontSize:22,fontWeight:700,cursor:"pointer",
-background:isEquals?"var(--gradient)":isOp?"var(--accent-bg)":isAction?"var(--bg4)":"#fff",
-color:isEquals?"#fff":isOp?"var(--accent)":isAction?"var(--text2)":"var(--text)",
-boxShadow:isEquals?"0 4px 14px rgba(67,97,238,.25)":"0 1px 3px rgba(0,0,0,.06)",transition:"all .15s",fontFamily:"var(--mono)"}};
-return<div style={{display:"flex",justifyContent:"center"}}>
-<div className="card" style={{padding:24,width:"100%",maxWidth:380}}>
-<div className="stitle" style={{marginBottom:16}}><span className="stitle-icon">🧮</span> {lang==="uk"?"Калькулятор":"Калькулятор"}</div>
-<div style={{background:"linear-gradient(135deg,var(--card2),#F0F4FA)",borderRadius:14,padding:"24px 18px",marginBottom:16,border:"1px solid var(--border)",minHeight:100}}>
-<div style={{fontSize:13,color:"var(--text4)",fontFamily:"var(--mono)",minHeight:18,textAlign:"right",wordBreak:"break-all"}}>{expr||" "}</div>
-<div style={{fontSize:40,fontWeight:700,fontFamily:"var(--mono)",textAlign:"right",color:display==="Error"?"var(--red)":"var(--text)",wordBreak:"break-all",marginTop:6,lineHeight:1.1}}>{display}</div>
-</div>
-<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
-{btns.flat().map((b,i)=><button key={i} onClick={()=>press(b)} style={btnStyle(b)} onMouseEnter={e=>e.currentTarget.style.filter="brightness(.96)"} onMouseLeave={e=>e.currentTarget.style.filter="none"}>{b}</button>)}
-</div>
-<div style={{fontSize:11,color:"var(--text4)",marginTop:14,textAlign:"center"}}>⌨️ {lang==="uk"?"Працює з клавіатурою":"Работает с клавиатуры"}</div>
-</div></div>}
-  
 /* ═══ SETTINGS PAGE ═══ */
 function SettingsPage({settings,onSave,onReset,showToast,data,onUpdate,lang}){
 const t=I18N[lang]||I18N.ru;
@@ -1948,9 +1700,6 @@ return<tr key={c} style={{borderTop:"1px solid var(--border)"}}>
 <div className="card" style={{padding:0,overflow:"hidden"}}><iframe srcDoc={expPreview} style={{width:"100%",height:"calc(100vh - 200px)",border:"none",borderRadius:16}} title="report"/></div></div>}</div>
 </div></div>})()}
 
-{/* ═══ УТИЛИТЫ ═══ */}
-{tab==="utils"&&(()=>{const Lg=I18N[(data.settings||{}).lang||"ru"]||I18N.ru;return<UtilsPage lang={(data.settings||{}).lang||"ru"} showToast={showToast}/>})()}
-  
 {/* ═══ НАСТРОЙКИ ═══ */}
 {tab==="settings"&&<SettingsPage settings={data.settings||{}} onSave={async s=>{await callApi("save_settings",JSON.stringify(s));reload()}} onReset={async()=>{await callApi("reset_settings");reload()}} showToast={showToast} data={data} onUpdate={reload} lang={(data.settings||{}).lang||"ru"}/>}
 
